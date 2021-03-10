@@ -6,8 +6,13 @@
 })
 
 (func main [(argc int) (argv char**)] int {
+	(decl test int)
+	(set test 2)
+	(set test (+ test 2))
+
 	(if [= argc 1] {
 		(hello "Turing Tarpit")
+		(printf "Value: %d\n" test)
 	})
 
 	(return 0)
