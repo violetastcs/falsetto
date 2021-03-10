@@ -10,6 +10,7 @@
 
 #include <backend/c-gen.h>
 
+// Setup CLI
 arg_app_t app = {
 	"Falsetto",
 	NULL,
@@ -28,6 +29,7 @@ int main(int argc, char *argv[]) {
 	log_level_filter = LOG_TRACE;
 	setlocale(LC_ALL, "");
 
+	// Parse command line arguments
 	kv_store_t arg_vals = kv_new();
 	app.binname = basename(argv[0]);
 
@@ -39,6 +41,7 @@ int main(int argc, char *argv[]) {
 	char *in_file = kv_get(&arg_vals, "INPUT");
 	char *out_file = kv_get(&arg_vals, "OUTPUT");
 
+	// Tokenize, parse and compile given input 
 	lexer_init_file(in_file);
 	atom_t program = parse();
 	compile(program, out_file);

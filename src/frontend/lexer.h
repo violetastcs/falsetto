@@ -20,9 +20,24 @@
 char *lexer_stream = NULL;
 size_t lexer_index = 0;
 
-wint_t lexer_read();
+wint_t peek = WEOF;
+
+// Read a single Unicode codepoint 
+wint_t lexer_read() {
+	if (lexer_stream[lexer_index] == 0) 
+		return WEOF;
+	else {
+		uint8_t char_size = utf8_char_size(lexer_stream + lexer_index);
+		wint_t c = utf8_to_int(lexer_stream + lexer_index);
+		lexer_index += char_size;
+		wint_t p = peek;
+		peek = c;
+		return p;
+	}
+}
 
 // TODO: support Windows/ReactOS
+// Open file, initialize the lexer and advance once to initialize peek
 void lexer_init_file(char *path) {
 	int file = open(path, O_RDONLY);
 
@@ -40,21 +55,6 @@ void lexer_init_file(char *path) {
 	}
 	// Initialize peek
 	lexer_read();
-}
-
-wint_t peek = WEOF;
-
-wint_t lexer_read() {
-	if (lexer_stream[lexer_index] == 0) 
-		return WEOF;
-	else {
-		uint8_t char_size = utf8_char_size(lexer_stream + lexer_index);
-		wint_t c = utf8_to_int(lexer_stream + lexer_index);
-		lexer_index += char_size;
-		wint_t p = peek;
-		peek = c;
-		return p;
-	}
 }
 
 typedef enum token_kind {
@@ -82,6 +82,7 @@ typedef struct token {
 	}
 } token_t;
 
+// Parse a single token and advance
 token_t lexer_next() {
 	token_t token;
 	token.start = lexer_index - 1;
@@ -89,19 +90,23 @@ token_t lexer_next() {
 	wint_t c = lexer_read();
 
 	switch (c) {
+		// End of file
 		case WEOF:
 			token.kind = TOKEN_EOF;
 			break;
+		// Open parenthesis
 		case '(':
 		case '[':
 		case '{':
 			token.kind = TOKEN_LPAREN;
 			break;
+		// Close parenthesis
 		case ')':
 		case ']':
 		case '}':
 			token.kind = TOKEN_RPAREN;
 			break;
+		// String literal
 		case '"':
 			token.kind = TOKEN_STRING;
 
@@ -116,6 +121,8 @@ token_t lexer_next() {
 			lexer_read();
 			
 			break;
+		// Integer
+		// TODO: parse floating point numbers
 		case '0':
 		case '1':
 		case '2':
@@ -135,6 +142,7 @@ token_t lexer_next() {
 
 			token.kind = TOKEN_INT;
 			break;
+		// A symbol (any other valid UTF-8 character)
 		default:
 			if (utf8_is_whitespace(c)) {
 				token.kind = TOKEN_SPACE;

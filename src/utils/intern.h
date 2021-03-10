@@ -9,6 +9,7 @@
 #include <utils/test.h>
 #include <utils/log.h>
 
+// An interned string
 typedef struct intern_entry {
 	uint64_t hash;
 	char *string;
@@ -16,6 +17,7 @@ typedef struct intern_entry {
 
 buffer_t(intern_entry_t) interned = NULL;
 
+// Look for an interned string by it's hash
 char *intern_find(uint64_t hash) {
 	for (size_t i = 0; i < buffer_len(interned); i++)
 		if (interned[i].hash == hash)
@@ -24,6 +26,7 @@ char *intern_find(uint64_t hash) {
 	return NULL;
 }
 
+// If a string has already been interned, return a pointer to it, else allocate and intern provided string
 char *intern_str(char *str) {
 	uint64_t hash = str_hash(str);
 
@@ -39,6 +42,7 @@ char *intern_str(char *str) {
 	}
 }
 
+// intern_str, except dealing with 2 points within a string
 char *intern_range(char *start, char *end) {
 	uint64_t hash = str_range_hash(start, end);
 
@@ -62,6 +66,7 @@ void intern_init() {
 	buffer_push(interned, entry);
 }
 
+// Deallocate all interned strings
 void intern_free() {
 	for (size_t i = 0; i < buffer_len(interned); i++) {
 		free(interned[i].string);
@@ -70,6 +75,7 @@ void intern_free() {
 	buffer_free(interned);
 }
 
+// Make sure the string interner works as anticipated
 test_result_t intern_test() {
 	char *str1 = intern_str("abc");
 	char *str2 = intern_str("abc");

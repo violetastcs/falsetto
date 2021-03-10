@@ -31,6 +31,7 @@ typedef struct atom {
 	}
 } atom_t;
 
+// Check if atom is a symbol and, if name != NULL, if it is equal to the name provided
 bool is_symbol(atom_t expr, char *name) {
 	if (name == NULL)
 		return expr.kind == ATOM_SYMBOL;
@@ -38,6 +39,7 @@ bool is_symbol(atom_t expr, char *name) {
 		return expr.kind == ATOM_SYMBOL and strcmp(expr.symbol_val, name) == 0;
 }
 
+// Print out an atom (for debugging only)
 void print_expr(atom_t atom) {
 	switch (atom.kind) {
 		case ATOM_INTEGER:
@@ -62,6 +64,7 @@ void print_expr(atom_t atom) {
 	}
 }
 
+// Take next token, skipping whitespace
 token_t parser_next() {
 	token_t next = lexer_next();
 	if (next.kind == TOKEN_SPACE)
@@ -71,6 +74,7 @@ token_t parser_next() {
 
 atom_t parse_item(token_t);
 
+// Parse an expression
 atom_t parse_expr() {
 	atom_t expr;
 	expr.kind = ATOM_EXPR;
@@ -90,6 +94,7 @@ atom_t parse_expr() {
 	return expr;
 }
 
+// Parse a top-level file (the same as parsing an expression except without the ending ')')
 atom_t parse() {
 	atom_t atom;
 	atom.kind = ATOM_EXPR;
@@ -107,6 +112,7 @@ atom_t parse() {
 	return atom;
 }
 
+// Parse individual item
 atom_t parse_item(token_t next) {
 	atom_t atom;
 	
@@ -126,9 +132,12 @@ atom_t parse_item(token_t next) {
 			atom.kind = ATOM_STRING;
 			char *str = next.string_val;
 
+			// Make sure the string is valid (starts and ends with a quotation mark)
 			assert(str[0] == '"');
 			assert(str[strlen(str) - 1] == '"');
-			
+
+			// Reallocate the string, excluding the start and end '"'
+			// TODO: make this more efficient (somehow)
 			atom.string_val = intern_range(str + 1, str + strlen(str) - 1);
 			break;
 		case TOKEN_SYMBOL: 
@@ -138,13 +147,4 @@ atom_t parse_item(token_t next) {
 	}
 
 	return atom;
-}
-
-token_t parser_expect(token_kind_t kind) {
-	token_t next = parser_next();
-
-	if (next.kind != kind) 
-		error(1, "Expected %d, found %d", kind, next.kind);
-	else
-		return next;
 }

@@ -7,6 +7,7 @@
 #include <utils/ansi-fmt.h>
 #include <utils/buffer.h>
 
+// Various types of log message
 typedef enum {
 	LOG_TRACE,
 	LOG_DEBUG,
@@ -16,6 +17,7 @@ typedef enum {
 	LOG_OFF
 } loglevel_t;
 
+// Formatted string for various log levels
 const char *log_level_name[] = {
 	[LOG_TRACE] = ANSI_FG_MAGENTA "TRACE" ANSI_RESET,
 	[LOG_DEBUG] = ANSI_FG_CYAN    "DEBUG" ANSI_RESET,
@@ -24,16 +26,21 @@ const char *log_level_name[] = {
 	[LOG_ERROR] = ANSI_FG_RED     "ERROR" ANSI_RESET
 };
 
+// Minimum level of importance that will be logged 
 loglevel_t log_level_filter = LOG_INFO;
 
+// Log a message with a given level, filename, line and message
 void log_inner(loglevel_t level, char *filename, uint32_t line, char *fmt, ...) {
+	// Only log if the importance is above the minimum level
 	if (level >= log_level_filter) {
 		time_t rawtime;
 		struct tm *ti;
 
+		// Get the current time
 		time(&rawtime);
 		ti = localtime(&rawtime);
 
+		// Print time, log level, file and position within the file
 		fprintf(
 			stderr,
 			ANSI_FG_WHITE "(%0*d:%0*d:%0*d) " ANSI_RESET "%s [%s:%d]: ",
@@ -45,6 +52,7 @@ void log_inner(loglevel_t level, char *filename, uint32_t line, char *fmt, ...) 
 		va_list args;
 		va_start(args, fmt);
 
+		// Print the given message
 		vfprintf(stderr, fmt, args);
 		fprintf(stderr, "\n");
 
@@ -52,6 +60,7 @@ void log_inner(loglevel_t level, char *filename, uint32_t line, char *fmt, ...) 
 	}
 }
 
+// Log various levels with file and position of caller attached
 #define log_trace(...) log_inner(LOG_TRACE, __FILE__, __LINE__, __VA_ARGS__)
 #define log_debug(...) log_inner(LOG_DEBUG, __FILE__, __LINE__, __VA_ARGS__)
 #define log_info(...)  log_inner(LOG_INFO,  __FILE__, __LINE__, __VA_ARGS__)

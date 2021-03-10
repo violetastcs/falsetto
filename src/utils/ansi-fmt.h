@@ -1,5 +1,7 @@
 #pragma once
 
+// Macros for ANSI escape sequences
+
 #define ANSI_RESET              "\x1b[0m"
 #define ANSI_BOLD               "\x1b[1m"
 

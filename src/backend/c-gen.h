@@ -9,6 +9,8 @@
 
 #include <frontend/parser.h>
 
+// Compile a list of arguments for a function, e.g.:
+//     [(argc int) (argv char**)]
 void compile_args(FILE *outp, atom_t args) {
 	fputc('(', outp);
 
@@ -29,6 +31,7 @@ void compile_args(FILE *outp, atom_t args) {
 	fputc(')', outp);
 }
 
+// Compile constant values, operators and function calls in an expression
 void compile_expr(FILE *outp, atom_t expr) {
 	fputc('(', outp);
 
@@ -78,6 +81,7 @@ void compile_expr(FILE *outp, atom_t expr) {
 
 void compile_body(FILE *outp, atom_t body);
 
+// Compile statements such as a return, function call, variable declaration, etc.
 void compile_statement(FILE *outp, atom_t expr) {
 	if (is_symbol(expr.expr[0], "return")) {
 		fprintf(outp, "return ");
@@ -102,6 +106,7 @@ void compile_statement(FILE *outp, atom_t expr) {
 	}
 }
 
+// Compile body of a function by iterating over and compiling all member statements
 void compile_body(FILE *outp, atom_t body) {
 	fputc('{', outp);
 
@@ -112,6 +117,8 @@ void compile_body(FILE *outp, atom_t body) {
 	fputc('}', outp);
 }
 
+// Compile a function, e.g.:
+//     (func main [(argc int) (argv char**)] int { ... })
 void compile_func(FILE *outp, atom_t func) {
 	assert(is_symbol(func.expr[0], "func"));
 
@@ -142,6 +149,7 @@ void compile_include(FILE *outp, atom_t inc) {
 	fprintf(outp, "#include <%s>\n", inc.expr[1].string_val);
 }
 
+// Compile the top level of a document
 void compile_tl(FILE *outp, atom_t program) {
 	assert(program.kind == ATOM_EXPR);
 
@@ -160,6 +168,7 @@ void compile_tl(FILE *outp, atom_t program) {
 	}
 }
 
+// Open file for output and compile input expression
 void compile(atom_t program, char *out_path) {
 	FILE *outp = stdout;
 

@@ -15,6 +15,7 @@ typedef struct kv_value {
 	char *value;
 } kv_value_t;
 
+// A hashmap of string -> string
 typedef struct kv_store {
 	buffer_t(kv_value_t) values;
 } kv_store_t;
@@ -23,12 +24,14 @@ kv_store_t kv_new() {
 	return (kv_store_t){ NULL };
 }
 
+// Insert a string with a key
 void kv_insert(kv_store_t *store, char *key, char *value) {
 	uint64_t hash = str_hash(key);
 
 	buffer_push(store->values, (kv_value_t){ hash, intern_str(value) });
 }
 
+// Get a string with a key
 char *kv_get(kv_store_t *store, char *key) {
 	char *value = NULL;
 	uint64_t hash = str_hash(key);
@@ -43,6 +46,7 @@ char *kv_get(kv_store_t *store, char *key) {
 	return value;
 }
 
+// Make sure the kv store is working as intended
 test_result_t kv_test() {
 	kv_store_t store = { NULL };
 

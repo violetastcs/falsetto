@@ -8,6 +8,7 @@
 #include <utils/test.h>
 #include <utils/log.h>
 
+// Allocate a string on the heap
 char *heap_string(char *string) {
 	size_t len = strlen(string);
 	char *buf = malloc(len + 1);
@@ -20,6 +21,7 @@ char *heap_string(char *string) {
 	return buf;
 }
 
+// Slice a string between start and end and place on the heap
 char *heap_string_range(char *start, char *end) {
 	size_t len = (end - start);
 	char *buf = malloc(len + 1);
@@ -32,7 +34,7 @@ char *heap_string_range(char *start, char *end) {
 	return buf;
 }
 
-// FNV-1 hash
+// Get the FNV-1 hash of a buffer
 uint64_t buffer_hash(char *buf, size_t len) {
 	uint64_t hash = 14695981039346656037U;
 
@@ -46,10 +48,12 @@ uint64_t buffer_hash(char *buf, size_t len) {
 	return hash;
 }
 
+// Get the FNV-1 hash of a string
 uint64_t str_hash(char *str) {
 	return buffer_hash(str, strlen(str));
 }
 
+// Get the FNV-1 hash of a slice of a string
 uint64_t str_range_hash(char *start, char *end) {
 	return buffer_hash(start, end - start);
 }
@@ -70,6 +74,7 @@ test_result_t misc_test() {
 	return test_pass();
 }
 
+// Heap allocate a formatted string based on a varargs list
 char *vheap_fmt(char *fmt, va_list args) {
 	int size = vsnprintf(NULL, 0, fmt, args) + 1;
 	char *buf = malloc(size);
@@ -77,6 +82,7 @@ char *vheap_fmt(char *fmt, va_list args) {
 	return buf;
 }
 
+// Heap allocate a formatted string based on passed arguments
 char *heap_fmt(char *fmt, ...) {
 	va_list args;
 	va_start(args, fmt);
@@ -87,6 +93,7 @@ char *heap_fmt(char *fmt, ...) {
 	return buf;
 }
 
+// Print an error message and exit with code
 void error(int code, char *fmt, ...) {
 	va_list args;
 	va_start(args, fmt);
@@ -97,4 +104,5 @@ void error(int code, char *fmt, ...) {
 	exit(code);
 }
 
+// Exits with a TODO message
 #define TODO(...) error(1, "TODO: " __VA_ARGS__)
