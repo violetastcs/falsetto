@@ -24,9 +24,10 @@ wint_t peek = WEOF;
 
 // Read a single Unicode codepoint 
 wint_t lexer_read() {
-	if (lexer_stream[lexer_index] == 0) 
+	if (lexer_stream[lexer_index] == 0) {
+		peek = WEOF;
 		return WEOF;
-	else {
+	} else {
 		uint8_t char_size = utf8_char_size(lexer_stream + lexer_index);
 		wint_t c = utf8_to_int(lexer_stream + lexer_index);
 		lexer_index += char_size;
