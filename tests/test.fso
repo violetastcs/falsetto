@@ -1,9 +1,13 @@
 (include "stdio.h")
 (include "stdlib.h")
 
+(func hello [(name char*)] void {
+	(printf "Hello, %s!\n" name)
+})
+
 (func main [(argc int) (argv char**)] int {
 	(if [= argc 1] {
-		(printf "Random value: %d\n" (rand))
+		(hello "Turing Tarpit")
 	})
 
 	(return 0)

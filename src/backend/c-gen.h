@@ -135,6 +135,7 @@ void compile_func(FILE *outp, atom_t func) {
 	compile_args(outp, args_a);
 
 	compile_body(outp, body_a);
+	fputc('\n', outp);
 }
 
 void compile_include(FILE *outp, atom_t inc) {
