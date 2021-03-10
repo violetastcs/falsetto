@@ -58,6 +58,71 @@ void compile_expr(FILE *outp, atom_t expr) {
 				compile_expr(outp, expr.expr[1]);
 				fputs("==", outp);
 				compile_expr(outp, expr.expr[2]);
+
+			} else if (strcmp(operator, "<") == 0) {
+				compile_expr(outp, expr.expr[1]);
+				fputs("<", outp);
+				compile_expr(outp, expr.expr[2]);
+
+			} else if (strcmp(operator, ">") == 0) {
+				compile_expr(outp, expr.expr[1]);
+				fputs(">", outp);
+				compile_expr(outp, expr.expr[2]);
+
+			} else if (strcmp(operator, "<=") == 0) {
+				compile_expr(outp, expr.expr[1]);
+				fputs("<=", outp);
+				compile_expr(outp, expr.expr[2]);
+
+			} else if (strcmp(operator, ">=") == 0) {
+				compile_expr(outp, expr.expr[1]);
+				fputs(">=", outp);
+				compile_expr(outp, expr.expr[2]);
+
+			} else if (strcmp(operator, "!=") == 0) {
+				compile_expr(outp, expr.expr[1]);
+				fputs("!=", outp);
+				compile_expr(outp, expr.expr[2]);
+
+			} else if (strcmp(operator, "and") == 0) {
+				compile_expr(outp, expr.expr[1]);
+				fputs("&&", outp);
+				compile_expr(outp, expr.expr[2]);
+
+			} else if (strcmp(operator, "or") == 0) {
+				compile_expr(outp, expr.expr[1]);
+				fputs("||", outp);
+				compile_expr(outp, expr.expr[2]);
+
+			} else if (strcmp(operator, "not") == 0) {
+				fputc('!', outp);
+				compile_expr(outp, expr.expr[1]);
+
+			} else if (strcmp(operator, "+") == 0) {
+				compile_expr(outp, expr.expr[1]);
+				fputs("+", outp);
+				compile_expr(outp, expr.expr[2]);
+
+			} else if (strcmp(operator, "-") == 0) {
+				compile_expr(outp, expr.expr[1]);
+				fputs("-", outp);
+				compile_expr(outp, expr.expr[2]);
+
+			} else if (strcmp(operator, "*") == 0) {
+				compile_expr(outp, expr.expr[1]);
+				fputs("*", outp);
+				compile_expr(outp, expr.expr[2]);
+
+			} else if (strcmp(operator, "/") == 0) {
+				compile_expr(outp, expr.expr[1]);
+				fputs("/", outp);
+				compile_expr(outp, expr.expr[2]);
+
+			} else if (strcmp(operator, "%") == 0) {
+				compile_expr(outp, expr.expr[1]);
+				fputs("%", outp);
+				compile_expr(outp, expr.expr[2]);
+
 			} else {
 				fprintf(outp, "%s(", operator);
 

@@ -29,9 +29,9 @@ wint_t utf8_to_int(uint8_t const* c) {
 
 	switch (utf8_char_size(c)) {
 		case 1: return out;
-		case 2: return ((out & 31) << 6) | (c[1] & 63);
-		case 3: return ((out & 15) << 12) | ((c[1] & 63) << 6) | (c[2] & 63);
-		case 4: return ((out & 7) << 18) | ((c[1] & 63) << 12) | ((c[2] & 63) << 6) | (c[3] & 63);
+		case 2: return ((out & 31) << 6)  | (c[1]  & 63);
+		case 3: return ((out & 15) << 12) | ((c[1] & 63) << 6)  | (c[2]  & 63);
+		case 4: return ((out & 7) << 18)  | ((c[1] & 63) << 12) | ((c[2] & 63) << 6) | (c[3] & 63);
 	}
 
 	return 0;
