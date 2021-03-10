@@ -148,11 +148,7 @@ void compile_body(FILE *outp, atom_t body);
 
 // Compile statements such as a return, function call, variable declaration, etc.
 void compile_statement(FILE *outp, atom_t expr) {
-	if (is_symbol(expr.expr[0], "return")) {
-		fprintf(outp, "return ");
-		compile_expr(outp, expr.expr[1]);
-		fputc(';', outp);
-	} else if (is_symbol(expr.expr[0], "if")) {
+	if (is_symbol(expr.expr[0], "if")) {
 		fprintf(outp, "if(");
 		compile_expr(outp, expr.expr[1]);
 		fputc(')', outp);
@@ -182,13 +178,82 @@ void compile_statement(FILE *outp, atom_t expr) {
 	}
 }
 
+
+
+void compile_include(FILE *outp, atom_t inc) {
+	fprintf(outp, "#include <%s>\n", inc.expr[1].string_val);
+}
+
+void compile_tl(FILE *, atom_t);
+
+
+typedef struct comp_rule {
+	char *symbol;
+	void (*handler)(FILE *, atom_t);
+} comp_rule_t;
+
+void compile_rule(FILE *outp, atom_t item, comp_rule_t *rules) {
+	if (item.kind != ATOM_EXPR)
+		error(1, "compile_rules expects an expression");
+	if (!is_symbol(item.expr[0], NULL))
+		error(1, "compile_rules expects a symbol as the first member");
+
+	bool found = false;
+	size_t i = 0;
+	while (rules[i].handler != NULL) {
+		if (is_symbol(item.expr[0], rules[i].symbol)) {
+			found = true;
+			rules[i].handler(outp, item);
+			break;
+		}
+		
+		i++;
+	}
+
+	if (!found)
+		error(1, "Unknown expression: %s", item.expr[0].symbol_val);
+}
+
+void compile_rules(FILE *outp, atom_t program, comp_rule_t *rules) {
+	assert(program.kind == ATOM_EXPR);
+
+	for (size_t i = 0; i < buffer_len(program.expr); i++) {
+		atom_t expr = program.expr[i];
+
+		if (buffer_len(expr.expr) == 0)
+			continue;
+
+		compile_rule(outp, expr, rules);
+	}
+}
+
+void compile_func(FILE*, atom_t);
+void compile_return(FILE *, atom_t);
+
+comp_rule_t top_level[] = {
+	{ "func",    compile_func    },
+	{ "include", compile_include },
+	{ NULL }
+};
+
+comp_rule_t statement[] = {
+	{ "return", compile_return    },
+	{ NULL,     compile_statement },
+	{ NULL }
+};
+
+void compile_return(FILE *outp, atom_t ret) {
+	assert(is_symbol(ret.expr[0], "return"));
+	fprintf(outp, "return ");
+	compile_expr(outp, ret.expr[1]);
+	fputc(';', outp);
+}
+
 // Compile body of a function by iterating over and compiling all member statements
 void compile_body(FILE *outp, atom_t body) {
 	fputc('{', outp);
 
-	for (size_t i = 0; i < buffer_len(body.expr); i++) {
-		compile_statement(outp, body.expr[i]);
-	}
+	compile_rules(outp, body, statement);
 
 	fputc('}', outp);
 }
@@ -221,29 +286,6 @@ void compile_func(FILE *outp, atom_t func) {
 	fputc('\n', outp);
 }
 
-void compile_include(FILE *outp, atom_t inc) {
-	fprintf(outp, "#include <%s>\n", inc.expr[1].string_val);
-}
-
-// Compile the top level of a document
-void compile_tl(FILE *outp, atom_t program) {
-	assert(program.kind == ATOM_EXPR);
-
-	for (size_t i = 0; i < buffer_len(program.expr); i++) {
-		atom_t expr = program.expr[i];
-
-		if (buffer_len(expr.expr) == 0)
-			continue;
-
-		if (is_symbol(expr.expr[0], "func")) 
-			compile_func(outp, expr);
-		else if (is_symbol(expr.expr[0], "include"))
-			compile_include(outp, expr);
-		else 
-			error(1, "Unknown expression");
-	}
-}
-
 // Open file for output and compile input expression
 void compile(atom_t program, char *out_path) {
 	FILE *outp = stdout;
@@ -257,8 +299,9 @@ void compile(atom_t program, char *out_path) {
 		}
 	}
 
-	compile_tl(outp, program);
+	compile_rules(outp, program, top_level);
 
 	if (outp != stdout)
 		fclose(outp);
 }
+
