@@ -157,6 +157,11 @@ void compile_statement(FILE *outp, atom_t expr) {
 		compile_expr(outp, expr.expr[1]);
 		fputc(')', outp);
 		compile_body(outp, expr.expr[2]);
+	} else if (is_symbol(expr.expr[0], "while")) {
+		fprintf(outp, "while(");
+		compile_expr(outp, expr.expr[1]);
+		fputc(')', outp);
+		compile_body(outp, expr.expr[2]);
 	} else if (is_symbol(expr.expr[0], "decl")) {
 		fprintf(outp, "%s %s;", expr.expr[2].symbol_val, expr.expr[1].symbol_val);
 	} else if (is_symbol(expr.expr[0], "set")) {

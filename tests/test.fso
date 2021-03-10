@@ -15,6 +15,14 @@
 		(printf "Value: %d\n" test)
 	})
 
+	(decl i int)
+	(set i 0)
+
+	(while [< i 10] {
+		(printf "I: %d\n" i)
+		(set i (+ i 1))
+	})
+
 	(return 0)
 })
 
