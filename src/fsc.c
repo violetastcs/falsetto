@@ -7,8 +7,10 @@
 
 #include <frontend/lexer.h>
 #include <frontend/parser.h>
+#include <frontend/ast.h>
 
 #include <backend/c-gen.h>
+#include <backend/type-check.h>
 
 // Setup CLI
 arg_app_t app = {
@@ -44,7 +46,9 @@ int main(int argc, char *argv[]) {
 	// Tokenize, parse and compile given input 
 	lexer_init_file(in_file);
 	atom_t program = parse();
-	compile(program, out_file);
+	ast_program_t ast = parse_program(program);
+	compile(ast, out_file);
+	printf("\n");
 	
 	return 0;
 }
