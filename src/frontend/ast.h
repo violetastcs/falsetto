@@ -591,6 +591,9 @@ buffer_t(ast_arg_t) parse_args(atom_t args) {
 		arg.name = name.symbol_val;
 		arg.type = parse_type(type);
 
+		if (arg.type.kind == TYPE_VARARG)
+			log_info("Func has vararg");
+
 		buffer_push(list, arg);
 	}
 
@@ -662,6 +665,10 @@ ast_program_t parse_program(atom_t program) {
 			func.name = intern_str(expr.expr[1].symbol_val);
 
 			func.args = parse_args(expr.expr[2]);
+
+			for (size_t i = 0; i < buffer_len(func.args); i++)
+				if (func.args[i].type.kind == TYPE_VARARG)
+					log_info("Func arg is vararg: %d", i);
 
 			func.ret = parse_type(expr.expr[3]);
 

@@ -278,6 +278,10 @@ void type_check(ast_program_t program) {
 
 		switch (tl.kind) {
 			case AST_TL_FUNC:
+				for (size_t i = 0; i < buffer_len(tl.func.args); i++) 
+					if (tl.func.args[i].type.kind == TYPE_VARARG)
+						log_info("Type check has vararg");
+				
 				for (size_t i = 0; i < buffer_len(tl.func.args); i++)
 					types_add(&types, tl.func.args[i].name, tl.func.args[i].type);
 
