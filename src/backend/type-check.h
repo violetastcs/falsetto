@@ -69,6 +69,7 @@ typedef struct func_type_info {
 	uint64_t hash;
 	type_t ret;
 	buffer_t(type_t) args;
+	bool vararg;
 } func_type_info_t;
 
 buffer_t(func_type_info_t) func_defs = NULL;
@@ -79,13 +80,10 @@ void add_func_def(ast_func_t func) {
 	f.hash = str_hash(func.name);
 	f.args = NULL;
 	f.ret = func.ret;
+	f.vararg = func.vararg;
 
-	for (size_t i = 0; i < buffer_len(func.args); i++) {
-		if (func.args[i].type.kind == TYPE_VARARG)
-			log_info("ADD FUNC DEF VARARG!!!!!!!!!!!!!!");
-		
+	for (size_t i = 0; i < buffer_len(func.args); i++)
 		buffer_push(f.args, func.args[i].type);
-	}
 
 	buffer_push(func_defs, f);
 }
@@ -109,12 +107,7 @@ type_t type_of_expr(type_list_t types, ast_expr_t expr);
 type_t type_of_call(type_list_t types, ast_call_t call) {
 	func_type_info_t info = get_func_def(call.name);
 
-	for (size_t i = 0; i < buffer_len(info.args); i++) 
-		if (info.args[i].kind == TYPE_VARARG)
-			return info.ret;
-
-	// ONLY WHILE VARARGS ISNT WORKING
-	if (strcmp(call.name, "printf") == 0)
+	if (info.vararg)
 		return info.ret;
 
 	size_t argc = buffer_len(info.args);
@@ -278,10 +271,6 @@ void type_check(ast_program_t program) {
 
 		switch (tl.kind) {
 			case AST_TL_FUNC:
-				for (size_t i = 0; i < buffer_len(tl.func.args); i++) 
-					if (tl.func.args[i].type.kind == TYPE_VARARG)
-						log_info("Type check has vararg");
-				
 				for (size_t i = 0; i < buffer_len(tl.func.args); i++)
 					types_add(&types, tl.func.args[i].name, tl.func.args[i].type);
 

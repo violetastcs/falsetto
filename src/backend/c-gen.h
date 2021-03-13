@@ -147,15 +147,14 @@ void compile_program(FILE *outp, ast_program_t program) {
 				for (size_t i = 0; i < buffer_len(item.func.args); i++) {
 					ast_arg_t arg = item.func.args[i];
 
-					if (type_cmp(arg.type, type_kind(TYPE_VARARG))) {
-						fputs("...", outp);
-						break;
-					} else 
-						fprintf(outp, "%s %s", type_to_str(arg.type), arg.name);
+					fprintf(outp, "%s %s", type_to_str(arg.type), arg.name);
 
 					if (i != buffer_len(item.func.args) - 1)
 						fputc(',', outp);
 				}
+
+				if (item.func.vararg)
+					fputs(",...", outp);
 
 				fputc(')', outp);
 

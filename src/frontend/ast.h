@@ -24,7 +24,6 @@ typedef enum type_kind {
 
 	TYPE_BOOL,
 	TYPE_VOID,
-	TYPE_VARARG,
 
 	TYPE_POINTER,
 	TYPE_ARRAY
@@ -119,7 +118,6 @@ char *type_str_lang[] = {
 
 	[TYPE_BOOL] = "Bool",
 	[TYPE_VOID] = "Void",
-	[TYPE_VARARG] = "CVarArgs"
 };
 
 char *type_as_string(type_t type) {
@@ -169,8 +167,6 @@ type_t parse_type(atom_t type) {
 				t.kind = TYPE_VOID;
 			} else if (strcmp(sym, "Bool") == 0) {
 				t.kind = TYPE_BOOL;
-			} else if (strcmp(sym, "CVarArgs") == 0) {
-				return type_kind(TYPE_VARARG);
 			}
 			else 
 				error(1, "Unknown type: %s", sym);
@@ -573,28 +569,33 @@ typedef struct ast_arg {
 	type_t type;
 } ast_arg_t;
 
-buffer_t(ast_arg_t) parse_args(atom_t args) {
+buffer_t(ast_arg_t) parse_args(atom_t args, bool *vararg) {
 	buffer_t(ast_arg_t) list = NULL;
+
+	*vararg = false;
 
 	if (args.kind != ATOM_EXPR)
 		error(1, "Argument list must be an expression");
 	
 	for (size_t i = 0; i < buffer_len(args.expr); i++) {
-		atom_t name = args.expr[i].expr[0];
-		atom_t type = args.expr[i].expr[1];
+		if (is_symbol(args.expr[i], "...")) {
+			*vararg = true;
+			break;
+		} else if (args.expr[i].kind == ATOM_EXPR) {
+			atom_t name = args.expr[i].expr[0];
+			atom_t type = args.expr[i].expr[1];
 
-		if (!is_symbol(name, NULL))
-			error(1, "Argument name must be a symbol");
+			if (!is_symbol(name, NULL))
+				error(1, "Argument name must be a symbol");
 
-		ast_arg_t arg;
+			ast_arg_t arg;
 
-		arg.name = name.symbol_val;
-		arg.type = parse_type(type);
+			arg.name = name.symbol_val;
+			arg.type = parse_type(type);
 
-		if (arg.type.kind == TYPE_VARARG)
-			log_info("Func has vararg");
-
-		buffer_push(list, arg);
+			buffer_push(list, arg);
+		} else 
+			error(1, "Function argument must be (Name Type) or ...");
 	}
 
 	return list;
@@ -605,6 +606,7 @@ typedef struct ast_func {
 	buffer_t(ast_arg_t) args;
 	type_t ret;
 	buffer_t(ast_statement_t) body;
+	bool vararg;
 } ast_func_t;
 
 typedef enum ast_tl_kind {
@@ -662,27 +664,23 @@ ast_program_t parse_program(atom_t program) {
 
 			if (!is_symbol(expr.expr[1], NULL)) 
 				error(1, "Function identifier must be a symbol");
+
 			func.name = intern_str(expr.expr[1].symbol_val);
-
-			func.args = parse_args(expr.expr[2]);
-
-			for (size_t i = 0; i < buffer_len(func.args); i++)
-				if (func.args[i].type.kind == TYPE_VARARG)
-					log_info("Func arg is vararg: %d", i);
-
+			func.args = parse_args(expr.expr[2], &func.vararg);
 			func.ret = parse_type(expr.expr[3]);
-
                         func.body = NULL;
 
-			if (buffer_len(expr.expr) == 4)
-				continue;
-			else if (buffer_len(expr.expr) == 5) {
+			if (buffer_len(expr.expr) == 4) {
+				item.func = func;
+				goto LOOP_END;
+			} else if (buffer_len(expr.expr) == 5) {
 				func.body = parse_body(expr.expr[4]);
+				item.func = func;
 			} else 
 				error(1, "Invalid argument count to func");
-
-			item.func = func;
+			
 		}
+		LOOP_END:
 		buffer_push(prog.items, item);
 	}
 

@@ -1,7 +1,4 @@
-(include "stdio.h")
-(include "stdlib.h")
-
-(func printf [ (fmt (@ U8)) (abc CVarArgs) ] Void)
+(func printf [ (fmt (@ U8)) ... ] Void)
 
 (func hello [(name (@ U8))] Void {
 	(printf "Hello, %s!\n" name)
