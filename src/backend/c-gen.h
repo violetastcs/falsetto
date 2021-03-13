@@ -60,6 +60,9 @@ void compile_expr(FILE *outp, ast_expr_t expr) {
 		case AST_EXPR_STRING:
 			fprintf(outp, "\"%s\"", expr.string_val);
 			break;
+		case AST_EXPR_BOOL:
+			fputc(expr.bool_val ? 1 : 0, outp);
+			break;
 
 		case AST_EXPR_BINOP:
 			fputc('(', outp);
@@ -94,7 +97,7 @@ char *cflows[] = {
 void compile_statement(FILE *outp, ast_statement_t st) {
 	switch (st.kind) {
 		case AST_STATEMENT_DECL:
-			fprintf(outp, "%s %s;", st.decl.type, st.decl.name);
+			fprintf(outp, "%s %s;", type_to_str(st.decl.type), st.decl.name);
 			break;
 
 		case AST_STATEMENT_SET:
@@ -139,12 +142,16 @@ void compile_program(FILE *outp, ast_program_t program) {
 				break;
 
 			case AST_TL_FUNC:
-				fprintf(outp, "%s %s(", item.func.ret, item.func.name);
+				fprintf(outp, "%s %s(", type_to_str(item.func.ret), item.func.name);
 
 				for (size_t i = 0; i < buffer_len(item.func.args); i++) {
 					ast_arg_t arg = item.func.args[i];
 
-					fprintf(outp, "%s %s", arg.type, arg.name);
+					if (type_cmp(arg.type, type_kind(TYPE_VARARG))) {
+						fputs("...", outp);
+						break;
+					} else 
+						fprintf(outp, "%s %s", type_to_str(arg.type), arg.name);
 
 					if (i != buffer_len(item.func.args) - 1)
 						fputc(',', outp);

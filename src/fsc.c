@@ -47,6 +47,7 @@ int main(int argc, char *argv[]) {
 	lexer_init_file(in_file);
 	atom_t program = parse();
 	ast_program_t ast = parse_program(program);
+	type_check(ast);
 	compile(ast, out_file);
 	printf("\n");
 	

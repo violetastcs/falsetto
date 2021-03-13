@@ -1,12 +1,14 @@
 (include "stdio.h")
 (include "stdlib.h")
 
-(func hello [(name char*)] void {
+(func printf [ (fmt (@ U8)) (abc CVarArgs) ] Void)
+
+(func hello [(name (@ U8))] Void {
 	(printf "Hello, %s!\n" name)
 })
 
-(func main [(argc int) (argv char**)] int {
-	(decl test int)
+(func main [(argc I32) (argv (@ (@ U8)))] I32 {
+	(decl test I32)
 	(set test 2)
 	(set test (+ test 2))
 
@@ -15,7 +17,7 @@
 		(printf "Value: %d\n" test)
 	})
 
-	(decl i int)
+	(decl i I32)
 	(set i 0)
 
 	(while [< i 10] {

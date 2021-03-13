@@ -9,6 +9,189 @@
 
 #include <frontend/parser.h>
 
+typedef enum type_kind {
+	TYPE_I8,
+	TYPE_U8,
+
+	TYPE_I16,
+	TYPE_U16,
+
+	TYPE_I32,
+	TYPE_U32,
+
+	TYPE_I64,
+	TYPE_U64,
+
+	TYPE_BOOL,
+	TYPE_VOID,
+	TYPE_VARARG,
+
+	TYPE_POINTER,
+	TYPE_ARRAY
+} type_kind_t;
+
+char *type_str[] = {
+	[TYPE_U8]   = "unsigned char",
+	[TYPE_I8]   = "signed char",
+	[TYPE_U16]  = "unsigned short",
+	[TYPE_I16]  = "short",
+	[TYPE_U32]  = "unsigned int",
+	[TYPE_I32]  = "int",
+	[TYPE_U64]  = "unsigned long long",
+	[TYPE_I64]  = "long long",
+	[TYPE_BOOL] = "int",
+	[TYPE_VOID] = "void"
+};
+
+typedef struct type {
+	type_kind_t kind;
+
+	size_t count;
+	struct type *child;
+} type_t;
+
+char *type_to_str(type_t type) {
+	switch (type.kind) {
+		case TYPE_ARRAY:
+			TODO("Implement arrays");
+		case TYPE_POINTER:
+			return heap_fmt("%s*", type_to_str(*type.child));
+		default:
+			return type_str[type.kind];
+
+	}
+}
+
+bool is_integer(type_t type) {
+	return 
+		   type.kind == TYPE_I8
+		or type.kind == TYPE_U8
+		or type.kind == TYPE_I16
+		or type.kind == TYPE_U16
+		or type.kind == TYPE_I32
+		or type.kind == TYPE_U32
+		or type.kind == TYPE_I64
+		or type.kind == TYPE_U64
+	;
+}
+
+type_t type_kind(type_kind_t kind) {
+	type_t t;
+	t.kind = kind;
+	return t;
+}
+
+type_t type_ptr(type_t type) {
+	type_t t;
+	t.kind = TYPE_POINTER;
+	t.child = malloc(sizeof(type_t));
+	*t.child = type;
+}
+
+bool is_string(type_t type) {
+	return type.kind == TYPE_POINTER and type.child->kind == TYPE_U8;
+}
+
+bool type_cmp(type_t lhs, type_t rhs) {
+	if (lhs.kind == TYPE_POINTER && rhs.kind == TYPE_POINTER)
+		return type_cmp(*lhs.child, *rhs.child);
+
+	else if (lhs.kind == TYPE_ARRAY && rhs.kind == TYPE_ARRAY)
+		return type_cmp(*lhs.child, *rhs.child) && lhs.count == rhs.count;
+
+	else 
+		return 
+			   (is_integer(lhs) and is_integer(rhs)) 
+			or (is_string(lhs) and is_string(rhs))
+			or rhs.kind == lhs.kind
+		;
+}
+
+char *type_str_lang[] = {
+	[TYPE_U8] = "U8",
+	[TYPE_I8] = "I8",
+	[TYPE_U16] = "U16",
+	[TYPE_I16] = "I16",
+	[TYPE_U32] = "U32",
+	[TYPE_I32] = "I32",
+	[TYPE_U64] = "U64",
+	[TYPE_I64] = "I64",
+
+	[TYPE_BOOL] = "Bool",
+	[TYPE_VOID] = "Void",
+	[TYPE_VARARG] = "CVarArgs"
+};
+
+char *type_as_string(type_t type) {
+	switch (type.kind) {
+		case TYPE_ARRAY:
+			return heap_fmt("(Array %s %d)", type_as_string(*type.child), type.count);
+		case TYPE_POINTER:
+			return heap_fmt("(^ %s)", type_as_string(*type.child));
+
+		default:
+			return type_str_lang[type.kind];
+	}
+}
+
+type_t parse_type(atom_t type) {
+	type_t t;
+
+	switch (type.kind) {
+		case ATOM_SYMBOL:
+			{}
+			char *sym = type.symbol_val;
+
+			if (strcmp(sym, "I8") == 0) {
+				t.kind = TYPE_I8;
+			}
+			 else if (strcmp(sym, "U8") == 0) {
+				t.kind = TYPE_U8;
+			}
+			else if (strcmp(sym, "I16") == 0) {
+				t.kind = TYPE_I16;
+			}
+			else if (strcmp(sym, "U16") == 0) {
+				t.kind = TYPE_U16;
+			}
+			else if (strcmp(sym, "I32") == 0) {
+				t.kind = TYPE_I32;
+			}
+			else if (strcmp(sym, "U32") == 0) {
+				t.kind = TYPE_U32;
+			}
+			else if (strcmp(sym, "I64") == 0) {
+				t.kind = TYPE_I64;
+			}
+			 else if (strcmp(sym, "U64") == 0) {
+				t.kind = TYPE_U64;
+			} else if (strcmp(sym, "Void") == 0) {
+				t.kind = TYPE_VOID;
+			} else if (strcmp(sym, "Bool") == 0) {
+				t.kind = TYPE_BOOL;
+			} else if (strcmp(sym, "CVarArgs") == 0) {
+				return type_kind(TYPE_VARARG);
+			}
+			else 
+				error(1, "Unknown type: %s", sym);
+			
+			break;
+
+		case ATOM_EXPR:
+			if (is_symbol(type.expr[0], "Array"))
+				TODO("Implement array types");
+			else if (is_symbol(type.expr[0], "@")) {
+				t.kind = TYPE_POINTER;
+				t.child = malloc(sizeof(type_t));
+				*t.child = parse_type(type.expr[1]);
+			} else 
+				error(1, "Invalid type modifier");
+			break;
+	}
+	
+	return t;
+}
+
 typedef enum ast_binop_kind {
 	AST_BINOP_ADD = 1,
 	AST_BINOP_SUB,
@@ -53,6 +236,7 @@ typedef enum ast_expr_kind {
 	AST_EXPR_STRING,
 	AST_EXPR_INTEGER,
 	AST_EXPR_FLOAT,
+	AST_EXPR_BOOL,
 	AST_EXPR_CALL
 } ast_expr_kind_t;
 
@@ -67,6 +251,7 @@ typedef struct ast_expr {
 		char *string_val;
 		char *symbol_val;
 		double float_val;
+		bool bool_val;
 	}
 } ast_expr_t;
 
@@ -82,9 +267,19 @@ ast_expr_t parse_ast_expr(atom_t expr) {
 			e.kind = AST_EXPR_STRING;
 			e.string_val = expr.string_val;
 			break;
-		case ATOM_SYMBOL:
-			e.kind = AST_EXPR_SYMBOL;
-			e.symbol_val = expr.symbol_val;
+		case ATOM_SYMBOL:{}
+			char *sym = expr.symbol_val;
+
+			if (strcmp(sym, "true") == 0) {
+				e.kind = AST_EXPR_BOOL;
+				e.bool_val = true;
+			} else if (strcmp(sym, "false") == 0) {
+				e.kind = AST_EXPR_BOOL;
+				e.bool_val = false;
+			} else {
+				e.kind = AST_EXPR_SYMBOL;
+				e.symbol_val = expr.symbol_val;
+			}
 			break;
 		case ATOM_FLOAT:
 			e.kind = AST_EXPR_FLOAT;
@@ -265,7 +460,7 @@ typedef struct ast_set {
 
 typedef struct ast_decl {
 	char *name;
-	char *type;
+	type_t type;
 } ast_decl_t;
 
 typedef enum ast_statement_kind {
@@ -313,11 +508,8 @@ buffer_t(ast_statement_t) parse_body(atom_t body) {
 			if (!is_symbol(atom.expr[1], NULL))
 				error(1, "Variable identifier must be a symbol");
 
-			if (!is_symbol(atom.expr[2], NULL))
-				TODO("Implement type checking");
-
 			st.decl.name = atom.expr[1].symbol_val;
-			st.decl.type = atom.expr[2].symbol_val;
+			st.decl.type = parse_type(atom.expr[2]);
 
 		} else if (strcmp(symbol, "set") == 0) {
 			if (buffer_len(atom.expr) != 3)
@@ -378,7 +570,7 @@ buffer_t(ast_statement_t) parse_body(atom_t body) {
 
 typedef struct ast_arg {
 	char *name;
-	char *type;
+	type_t type;
 } ast_arg_t;
 
 buffer_t(ast_arg_t) parse_args(atom_t args) {
@@ -394,13 +586,10 @@ buffer_t(ast_arg_t) parse_args(atom_t args) {
 		if (!is_symbol(name, NULL))
 			error(1, "Argument name must be a symbol");
 
-		if (!is_symbol(type, NULL)) 
-			error(1, "Argument type must be a symbol (TODO: type checking)");
-
 		ast_arg_t arg;
 
 		arg.name = name.symbol_val;
-		arg.type = type.symbol_val;
+		arg.type = parse_type(type);
 
 		buffer_push(list, arg);
 	}
@@ -411,7 +600,7 @@ buffer_t(ast_arg_t) parse_args(atom_t args) {
 typedef struct ast_func {
 	char *name;
 	buffer_t(ast_arg_t) args;
-	char *ret;
+	type_t ret;
 	buffer_t(ast_statement_t) body;
 } ast_func_t;
 
@@ -463,7 +652,6 @@ ast_program_t parse_program(atom_t program) {
 
 			item.inc_file = expr.expr[1].string_val;
 
-			log_trace("Valid include!");
 		} else if (strcmp(symbol, "func") == 0) {
 			item.kind = AST_TL_FUNC;
 
@@ -475,12 +663,9 @@ ast_program_t parse_program(atom_t program) {
 
 			func.args = parse_args(expr.expr[2]);
 
-			if (!is_symbol(expr.expr[3], NULL))
-				error(1, "Function return type must be a symbol");
+			func.ret = parse_type(expr.expr[3]);
 
-			func.ret = intern_str(expr.expr[3].symbol_val);
-
-			func.body = NULL;
+                        func.body = NULL;
 
 			if (buffer_len(expr.expr) == 4)
 				continue;
