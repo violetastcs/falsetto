@@ -43,22 +43,22 @@ bool is_symbol(atom_t expr, char *name) {
 void print_expr(atom_t atom) {
 	switch (atom.kind) {
 		case ATOM_INTEGER:
-			log_trace("INTEGER: %ld ", atom.integer_val);
+			log_trace("Integer (%ld) ", atom.integer_val);
 			break;
 		case ATOM_FLOAT:
-			log_trace("FLOAT: %f ", atom.float_val);
+			log_trace("Float (%f) ", atom.float_val);
 			break;
 		case ATOM_SYMBOL:
-			log_trace("SYMBOL: %s ", atom.symbol_val);
+			log_trace("Symbol (%s) ", atom.symbol_val);
 			break;
 		case ATOM_STRING:
-			log_trace("STRING: \"%s\" ", atom.string_val);
+			log_trace("String (\"%s\") ", atom.string_val);
 			break;
 		case ATOM_EXPR:
-			log_trace("BEGIN EXPRESSION");
+			log_trace("Begin expression");
 			for (size_t i = 0; i < buffer_len(atom.expr); i++)
 				print_expr(atom.expr[i]);
-			log_trace("END EXPRESSION");
+			log_trace("End expression");
 
 			break;
 	}
@@ -96,6 +96,7 @@ atom_t parse_expr() {
 
 // Parse a top-level file (the same as parsing an expression except without the ending ')')
 atom_t parse() {
+	log_info("Begin parsing");
 	atom_t atom;
 	atom.kind = ATOM_EXPR;
 	atom.expr = NULL;
@@ -105,9 +106,12 @@ atom_t parse() {
 
 		if (next.kind == TOKEN_EOF)
 			break;
-		
-		buffer_push(atom.expr, parse_item(next));
+
+		atom_t expr = parse_item(next);
+		buffer_push(atom.expr, expr);
 	}
+
+	log_info("Parsing complete");
 
 	return atom;
 }

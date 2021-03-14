@@ -22,13 +22,14 @@ arg_app_t app = {
 };
 
 arg_def_t args[] = {
-	{ "input",  'i', "INPUT",  "Specify the input file",  arg_takes_val },
-	{ "output", 'o', "OUTPUT", "Specify the output file", arg_takes_val },
+	{ "input",  'i',   "INPUT",  "Specify the input file",            arg_takes_val },
+	{ "output", 'o',   "OUTPUT", "Specify the output file",           arg_takes_val },
+	{ "loglevel", 'l', "LOG",    "Specifiy the verbosity of logging", arg_takes_val },
 	{ NULL }
 };
 
 int main(int argc, char *argv[]) {
-	log_level_filter = LOG_TRACE;
+	log_level_filter = LOG_WARN;
 	setlocale(LC_ALL, "");
 
 	// Parse command line arguments
@@ -42,6 +43,19 @@ int main(int argc, char *argv[]) {
 
 	char *in_file = kv_get(&arg_vals, "INPUT");
 	char *out_file = kv_get(&arg_vals, "OUTPUT");
+	char *log_level = kv_get(&arg_vals, "LOG");
+
+	if (log_level != NULL) {
+		if (strcmp("trace", log_level) == 0) {
+			log_level_filter = LOG_TRACE;
+		} else if (strcmp("info", log_level) == 0) {
+			log_level_filter = LOG_INFO;
+		} else if (strcmp("warn", log_level) == 0) {
+			log_level_filter = LOG_WARN;
+		} else {
+			error(1, "%s: invalid log level: %s", argv[0], log_level);
+		}
+	}
 
 	// Tokenize, parse and compile given input 
 	lexer_init_file(in_file);
@@ -49,7 +63,6 @@ int main(int argc, char *argv[]) {
 	ast_program_t ast = parse_program(program);
 	type_check(ast);
 	compile(ast, out_file);
-	printf("\n");
 	
 	return 0;
 }

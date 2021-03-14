@@ -8,6 +8,14 @@
 #include <utils/test.h>
 #include <utils/log.h>
 
+// Print a new line and N tabs
+void nlt(int n) {
+	printf("\n");
+	for (; n >= 0; n--)
+		// Spaces for tabs to avoid ugly output with larger tab sizes
+		printf("    ");
+}
+
 // Allocate a string on the heap
 char *heap_string(char *string) {
 	size_t len = strlen(string);
