@@ -14,4 +14,4 @@ apk add meson gcc # replace with clang if you prefer
 ```
 
 ## Goals
-	At the moment, the only goal is to become self hosting, and everything added to the project is workign towards that goal.
+At the moment, the only goal is to become self hosting, and everything added to the project is workign towards that goal.
