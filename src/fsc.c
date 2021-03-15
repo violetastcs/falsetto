@@ -9,8 +9,8 @@
 #include <frontend/parser.h>
 #include <frontend/ast.h>
 
-#include <backend/c-gen.h>
-#include <backend/type-check.h>
+#include <visitors/c-gen.h>
+#include <visitors/type-check.h>
 
 // Setup CLI
 arg_app_t app = {

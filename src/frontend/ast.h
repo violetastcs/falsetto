@@ -42,6 +42,20 @@ char *type_str[] = {
 	[TYPE_VOID] = "void"
 };
 
+char *type_str_lang[] = {
+	[TYPE_U8] = "U8",
+	[TYPE_I8] = "I8",
+	[TYPE_U16] = "U16",
+	[TYPE_I16] = "I16",
+	[TYPE_U32] = "U32",
+	[TYPE_I32] = "I32",
+	[TYPE_U64] = "U64",
+	[TYPE_I64] = "I64",
+
+	[TYPE_BOOL] = "Bool",
+	[TYPE_VOID] = "Void",
+};
+
 typedef struct type {
 	type_kind_t kind;
 
@@ -49,10 +63,33 @@ typedef struct type {
 	struct type *child;
 } type_t;
 
+char *type_as_string(type_t type) {
+	switch (type.kind) {
+		case TYPE_ARRAY:
+			return heap_fmt("(Array %s %d)", type_as_string(*type.child), type.count);
+		case TYPE_POINTER:
+			return heap_fmt("(@ %s)", type_as_string(*type.child));
+
+		default:
+			return type_str_lang[type.kind];
+	}
+}
+
+char *type_mangle(type_t type) {
+	switch (type.kind) {
+		case TYPE_ARRAY:
+			return heap_fmt("_Array%s_%d", type_mangle(*type.child), type.count);
+		case TYPE_POINTER:
+			return heap_fmt("_Pointer%s", type_mangle(*type.child));
+		default:
+			return heap_fmt("_%s", type_str_lang[type.kind]);
+	}
+}
+
 char *type_to_str(type_t type) {
 	switch (type.kind) {
 		case TYPE_ARRAY:
-			TODO("Implement arrays");
+			return type_mangle(type);
 		case TYPE_POINTER:
 			return heap_fmt("%s*", type_to_str(*type.child));
 		default:
@@ -106,32 +143,6 @@ bool type_cmp(type_t lhs, type_t rhs) {
 		;
 }
 
-char *type_str_lang[] = {
-	[TYPE_U8] = "U8",
-	[TYPE_I8] = "I8",
-	[TYPE_U16] = "U16",
-	[TYPE_I16] = "I16",
-	[TYPE_U32] = "U32",
-	[TYPE_I32] = "I32",
-	[TYPE_U64] = "U64",
-	[TYPE_I64] = "I64",
-
-	[TYPE_BOOL] = "Bool",
-	[TYPE_VOID] = "Void",
-};
-
-char *type_as_string(type_t type) {
-	switch (type.kind) {
-		case TYPE_ARRAY:
-			return heap_fmt("(Array %s %d)", type_as_string(*type.child), type.count);
-		case TYPE_POINTER:
-			return heap_fmt("(@ %s)", type_as_string(*type.child));
-
-		default:
-			return type_str_lang[type.kind];
-	}
-}
-
 type_t parse_type(atom_t type) {
 	type_t t;
 
@@ -174,9 +185,16 @@ type_t parse_type(atom_t type) {
 			break;
 
 		case ATOM_EXPR:
-			if (is_symbol(type.expr[0], "Array"))
-				TODO("Implement array types");
-			else if (is_symbol(type.expr[0], "@")) {
+			if (is_symbol(type.expr[0], "Array")) {
+				t.kind = TYPE_ARRAY;
+				t.child = malloc(sizeof(type_t));
+				*t.child = parse_type(type.expr[1]);
+
+				if (type.expr[2].kind != ATOM_INTEGER) 
+					error(1, "Array length must be integer");
+
+				t.count = type.expr[2].integer_val;
+			} else if (is_symbol(type.expr[0], "@")) {
 				t.kind = TYPE_POINTER;
 				t.child = malloc(sizeof(type_t));
 				*t.child = parse_type(type.expr[1]);
@@ -225,6 +243,11 @@ typedef struct ast_call {
 	buffer_t(struct ast_expr) args;
 } ast_call_t;
 
+typedef struct ast_get {
+	struct ast_expr *array;
+	struct ast_expr *index;
+} ast_get_t;
+
 typedef enum ast_expr_kind {
 	AST_EXPR_BINOP,
 	AST_EXPR_UNIOP,
@@ -233,21 +256,26 @@ typedef enum ast_expr_kind {
 	AST_EXPR_INTEGER,
 	AST_EXPR_FLOAT,
 	AST_EXPR_BOOL,
+	AST_EXPR_ARRAY,
+	AST_EXPR_GET,
 	AST_EXPR_CALL
 } ast_expr_kind_t;
 
 typedef struct ast_expr {
 	ast_expr_kind_t kind;
+	type_t *type;
 
 	union {
 		ast_binop_t binop;
 		ast_unop_t unop;
 		ast_call_t call;
+		ast_get_t get;
 		int64_t int_val;
 		char *string_val;
 		char *symbol_val;
 		double float_val;
 		bool bool_val;
+		buffer_t(struct ast_expr) array;
 	}
 } ast_expr_t;
 
@@ -431,6 +459,22 @@ ast_expr_t parse_ast_expr(atom_t expr) {
 				e.unop.arg = malloc(sizeof(ast_unop_t));
 				*e.unop.arg = parse_ast_expr(expr.expr[1]);
 
+			}  else if (strcmp(op, "array") == 0) {
+				e.kind = AST_EXPR_ARRAY;
+				e.array = NULL;
+
+				for (size_t i = 1; i < buffer_len(expr.expr); i++)
+					buffer_push(e.array, parse_ast_expr(expr.expr[i]));
+
+			} else if (strcmp(op, "get") == 0) {
+				e.kind = AST_EXPR_GET;
+
+				e.get.array = malloc(sizeof(ast_expr_t));
+				e.get.index = malloc(sizeof(ast_expr_t));
+
+				*e.get.array = parse_ast_expr(expr.expr[1]);
+				*e.get.index = parse_ast_expr(expr.expr[2]);
+				
 			} else {
 				e.kind = AST_EXPR_CALL;
 				e.call.name = op;
@@ -439,9 +483,12 @@ ast_expr_t parse_ast_expr(atom_t expr) {
 				for (size_t i = 1; i < buffer_len(expr.expr); i++) 
 					buffer_push(e.call.args, parse_ast_expr(expr.expr[i]));
 			}
+
 			
 			break;
 	}
+
+	e.type = malloc(sizeof(type_t));
 
 	return e;
 }

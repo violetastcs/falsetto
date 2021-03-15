@@ -10,6 +10,9 @@
 
 #include <frontend/ast.h>
 
+buffer_t(uint64_t) def_hashes = NULL;
+buffer_t(char *) defs = NULL;
+
 typedef struct item_type_info {
 	uint64_t hash;
 	type_t type;
@@ -102,10 +105,43 @@ func_type_info_t get_func_def(char *name) {
 	return f;
 }
 
+char *array_template = 
+	"typedef struct{%s inner[%d];}%s;"
+	"%s get%s(%s a,int i){"
+		"return a.inner[i];"
+	"}"
+;
+
+char *array_gen(type_t type) {
+	char *ctype = type_to_str(*type.child);
+	char *mangle = type_mangle(type);
+	return heap_fmt(array_template, ctype, type.count, mangle, ctype, mangle);
+}
+
+void def_type(type_t type) {
+	if (type.kind == TYPE_ARRAY) {
+		uint64_t hash = type_mangle(type);
+		bool found = false;
+
+		for (size_t i = 0; i < buffer_len(def_hashes); i++) 
+			if (def_hashes[i] == hash)
+				found = true;
+
+		if (!found) {
+			def_type(*type.child);
+			buffer_push(defs, array_gen(type));
+			buffer_push(def_hashes, str_hash(type_mangle(type)));
+		}
+	}
+}
+
 type_t type_of_expr(type_list_t types, ast_expr_t expr);
 
 type_t type_of_call(type_list_t types, ast_call_t call) {
 	func_type_info_t info = get_func_def(call.name);
+
+	if (info.hash == 0)
+		error(1, "Unknown function %s", call.name);
 
 	if (info.vararg)
 		return info.ret;
@@ -136,24 +172,64 @@ type_t type_of_call(type_list_t types, ast_call_t call) {
 }
 
 type_t type_of_expr(type_list_t types, ast_expr_t expr) {
+	type_t expr_type;
+
+	log_trace("EXPR");
+	
 	switch (expr.kind) {
 		case AST_EXPR_SYMBOL:
-			return types_get(types, expr.symbol_val);
+			expr_type = types_get(types, expr.symbol_val);
+			log_trace("Symbol %s is type %s", expr.symbol_val, type_as_string(expr_type));
+			break;
 		case AST_EXPR_STRING: {}
 			type_t t;
 			t.kind = TYPE_POINTER;
 			t.child = malloc(sizeof(type_t));
 			*t.child = type_kind(TYPE_U8);
-			return t;
+			expr_type = t;
+			break;
 		case AST_EXPR_INTEGER:
-			return type_kind(TYPE_I64);
+			expr_type = type_kind(TYPE_I64);
+			break;
 		case AST_EXPR_FLOAT:
 			TODO("Implement floating point values");
 		case AST_EXPR_BOOL:
-			return type_kind(TYPE_BOOL);
+			expr_type = type_kind(TYPE_BOOL);
+			break;
 
 		case AST_EXPR_CALL: {}
-			return type_of_call(types, expr.call);
+			expr_type = type_of_call(types, expr.call);
+			break;
+
+		case AST_EXPR_ARRAY: {}
+			type_t type1 = type_of_expr(types, expr.array[0]);
+
+			for (size_t i = 1; i < buffer_len(expr.array); i++) {
+				type_t typei = type_of_expr(types, expr.array[i]);
+				if (!type_cmp(typei, type1))
+					error(1, "Item %ld of array expected '%s', found '%s'", i, type_as_string(type1), type_as_string(typei));
+			}
+
+			type_t arr;
+			arr.kind = TYPE_ARRAY;
+			arr.count = buffer_len(expr.array);
+			arr.child = malloc(sizeof(type_t));
+			*arr.child = type1;
+
+			expr_type = arr;
+			break;
+
+		case AST_EXPR_GET: {}
+			type_t array = type_of_expr(types, *expr.get.array);
+			type_t index = type_of_expr(types, *expr.get.index);
+
+			if (array.kind != TYPE_ARRAY)
+				error(1, "Get expects Array, found %s", type_as_string(array));
+
+			if (!is_integer(index))
+				error(1, "Get expects index  to be integer, found %s", type_as_string(index));
+
+			expr_type = *array.child;
 			break;
 
 		case AST_EXPR_UNIOP:
@@ -162,6 +238,8 @@ type_t type_of_expr(type_list_t types, ast_expr_t expr) {
 					type_t type = type_of_expr(types, *expr.unop.arg);
 					if (!type_cmp(type, type_kind(TYPE_BOOL)))
 						error(1, "not expects Bool, found %s", type_as_string(type));
+
+					expr_type = type;
 					
 					break;
 			}
@@ -185,7 +263,8 @@ type_t type_of_expr(type_list_t types, ast_expr_t expr) {
 						error(1, "Arithmetic operator expected Integer, found %s", type_as_string(lhs));
 					if (!is_integer(rhs))
 						error(1, "Arithmetic operator expected Integer, found %s", type_as_string(rhs));
-					return lhs;
+					expr_type = lhs;
+					break;
 
 				case AST_BINOP_EQ:
 				case AST_BINOP_NEQ:
@@ -193,7 +272,8 @@ type_t type_of_expr(type_list_t types, ast_expr_t expr) {
 				case AST_BINOP_GT:
 				case AST_BINOP_LTEQ:
 				case AST_BINOP_GTEQ:
-					return type_kind(TYPE_BOOL);
+					expr_type = type_kind(TYPE_BOOL);
+					break;
 
 				case AST_BINOP_AND:
 				case AST_BINOP_OR:
@@ -202,11 +282,17 @@ type_t type_of_expr(type_list_t types, ast_expr_t expr) {
 					if (!type_cmp(rhs, type_kind(TYPE_BOOL)))
 						error(1, "Boolean operator expected Bool, found %s", type_as_string(rhs));
 
-					return type_kind(TYPE_BOOL);
+					expr_type = type_kind(TYPE_BOOL);
+					break;
 			}
 
 			break;
 	}
+
+	def_type(expr_type);
+
+	*expr.type = expr_type;
+	return expr_type;
 }
 
 void check_body(type_t ret, type_list_t types, buffer_t(ast_statement_t) body) {
@@ -254,6 +340,7 @@ void check_body(type_t ret, type_list_t types, buffer_t(ast_statement_t) body) {
 }
 
 void type_check(ast_program_t program) {
+	log_info("Begin type checking");
 	type_list_t types = NULL;
 	
 	for (size_t i = 0; i < buffer_len(program.items); i++) {
@@ -278,4 +365,6 @@ void type_check(ast_program_t program) {
 				break;
 		}
 	}
+
+	log_trace("End type checking");
 }

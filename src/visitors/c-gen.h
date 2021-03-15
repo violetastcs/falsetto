@@ -8,6 +8,7 @@
 #include <utils/buffer.h>
 
 #include <frontend/ast.h>
+#include <visitors/type-check.h>
 
 char *binops[] = {
 	[AST_BINOP_ADD]  = "+",
@@ -88,6 +89,37 @@ void compile_expr(FILE *outp, ast_expr_t expr) {
 			fputc(')', outp);
 			break;
 
+		case AST_EXPR_ARRAY:
+			log_trace("Compiling array expression (AST_EXPR_ARRAY)");
+
+			fprintf(outp, "(%s)", type_mangle(*expr.type));
+
+			fputs("{{", outp);
+
+			for (size_t i = 0; i < buffer_len(expr.array); i++) {
+				compile_expr(outp, expr.array[i]);
+
+				if (i != buffer_len(expr.array) - 1) 
+					fputc(',', outp);
+			}
+			
+			fputs("}}", outp);
+			break;
+
+		case AST_EXPR_GET:
+			log_trace("Compiling get expression (AST_EXPR_GET");
+
+			ast_expr_t array = *expr.get.array;
+			ast_expr_t index = *expr.get.index;
+
+			fprintf(outp, "get%s(", type_mangle(*array.type));
+			compile_expr(outp, array);
+			fputc(',', outp);
+			compile_expr(outp, index);
+			fputc(')', outp);
+
+			break;
+	
 		case AST_EXPR_CALL:
 			compile_call(outp, expr.call);
 			break;
@@ -200,6 +232,9 @@ void compile(ast_program_t program, char *out_path) {
 			error(1, "Failed to open '%s': %s", out_path, strerror(err));
 		}
 	}
+
+	for (size_t i = 0; i < buffer_len(defs); i++) 
+		fputs(defs[i], outp);
 
 	compile_program(outp, program);
 

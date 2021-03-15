@@ -24,5 +24,8 @@
 
 	(printf "%d %d %d" 1 2 3)
 
+	(decl j I32)
+	(set j 0)
+
 	(return 0)
 })
