@@ -170,10 +170,9 @@ type_t type_of_call(type_list_t types, ast_call_t call) {
 		error(1, "Function %s expects %d arguments, found %d", call.name, argc, argp);
 
 	for (size_t i = 0; i < argp; i++) {
-		log_warn("Func arg: %d", i);
 		type_t type = type_of_expr(types, call.args[i]);
 
-		if (!type_cmp(type, info.args[i]) && !info.vararg) {
+		if (!type_cmp(type, info.args[i]) && i < argc) {
 			error(
 				1, 
 				"Argument %d for %s expected %s, found %s", 
@@ -243,7 +242,6 @@ type_t type_of_expr(type_list_t types, ast_expr_t expr) {
 			type_t array = type_of_expr(types, *expr.get.array);
 			type_t index = type_of_expr(types, *expr.get.index);
 
-			log_warn("GETGETGET");
 			log_info("Get from type %s to type %s", type_as_string(array), type_as_string(index));
 
 			if (array.kind != TYPE_ARRAY)
@@ -337,9 +335,6 @@ void check_body(type_t ret, type_list_t types, buffer_t(ast_statement_t) body) {
 			case AST_STATEMENT_SET: {}
 				type_t type_var = types_get(ty, st.set.name);
 
-				if (st.set.val.kind == AST_EXPR_GET)
-					log_error("GET LMAOOOOOO");
-				
 				type_t type_exp = type_of_expr(ty, st.set.val);
 
 				log_trace("Variable %s is type %s", st.set.name, type_as_string(type_var));
