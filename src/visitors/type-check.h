@@ -110,7 +110,7 @@ void add_func_def(ast_func_t func) {
 }
 
 func_type_info_t get_func_def(char *name) {
-	func_type_info_t f = { NULL };
+	func_type_info_t f = { 0 };
 	uint64_t hash = str_hash(name);
 
 	for (size_t i = 0; i < buffer_len(func_defs); i++) {
@@ -124,7 +124,7 @@ func_type_info_t get_func_def(char *name) {
 }
 
 char *array_template = 
-	"typedef struct{%s inner[%d];}%s;"
+	"typedef struct{%s inner[%ld];}%s;"
 	"%s get%s(%s a,int i){"
 		"return a.inner[i];"
 	"}"
@@ -133,12 +133,13 @@ char *array_template =
 char *array_gen(type_t type) {
 	char *ctype = type_to_str(*type.child);
 	char *mangle = type_mangle(type);
-	return heap_fmt(array_template, ctype, type.count, mangle, ctype, mangle);
+	return heap_fmt(array_template, ctype, type.count, mangle, ctype, mangle, mangle);
 }
 
 void def_type(type_t type) {
 	if (type.kind == TYPE_ARRAY) {
-		uint64_t hash = type_mangle(type);
+		char *mangled = type_mangle(type);
+		uint64_t hash = str_hash(mangled);
 		bool found = false;
 
 		for (size_t i = 0; i < buffer_len(def_hashes); i++) 
@@ -147,8 +148,9 @@ void def_type(type_t type) {
 
 		if (!found) {
 			def_type(*type.child);
-			buffer_push(defs, array_gen(type));
-			buffer_push(def_hashes, str_hash(type_mangle(type)));
+			char *gen = array_gen(type);
+			buffer_push(defs, gen);
+			buffer_push(def_hashes, str_hash(mangled));
 		}
 	}
 }
@@ -161,19 +163,17 @@ type_t type_of_call(type_list_t types, ast_call_t call) {
 	if (info.hash == 0)
 		error(1, "Unknown function %s", call.name);
 
-	if (info.vararg)
-		return info.ret;
-
 	size_t argc = buffer_len(info.args);
 	size_t argp = buffer_len(call.args);
 
-	if (argp != argc)
+	if (argp != argc && !info.vararg)
 		error(1, "Function %s expects %d arguments, found %d", call.name, argc, argp);
 
-	for (size_t i = 0; i < argc; i++) {
+	for (size_t i = 0; i < argp; i++) {
+		log_warn("Func arg: %d", i);
 		type_t type = type_of_expr(types, call.args[i]);
-		
-		if (!type_cmp(type, info.args[i])) {
+
+		if (!type_cmp(type, info.args[i]) && !info.vararg) {
 			error(
 				1, 
 				"Argument %d for %s expected %s, found %s", 
@@ -192,8 +192,9 @@ type_t type_of_call(type_list_t types, ast_call_t call) {
 type_t type_of_expr(type_list_t types, ast_expr_t expr) {
 	type_t expr_type;
 
-	log_trace("EXPR");
-	
+	if (expr.kind == AST_EXPR_GET)
+		log_error("GETGETGET");
+
 	switch (expr.kind) {
 		case AST_EXPR_SYMBOL:
 			expr_type = types_get(types, expr.symbol_val);
@@ -211,6 +212,7 @@ type_t type_of_expr(type_list_t types, ast_expr_t expr) {
 			break;
 		case AST_EXPR_FLOAT:
 			TODO("Implement floating point values");
+			break;
 		case AST_EXPR_BOOL:
 			expr_type = type_kind(TYPE_BOOL);
 			break;
@@ -240,6 +242,9 @@ type_t type_of_expr(type_list_t types, ast_expr_t expr) {
 		case AST_EXPR_GET: {}
 			type_t array = type_of_expr(types, *expr.get.array);
 			type_t index = type_of_expr(types, *expr.get.index);
+
+			log_warn("GETGETGET");
+			log_info("Get from type %s to type %s", type_as_string(array), type_as_string(index));
 
 			if (array.kind != TYPE_ARRAY)
 				error(1, "Get expects Array, found %s", type_as_string(array));
@@ -309,6 +314,9 @@ type_t type_of_expr(type_list_t types, ast_expr_t expr) {
 
 	def_type(expr_type);
 
+	if (expr.kind == AST_EXPR_GET)
+		log_info("Get type: %s", type_as_string(expr_type));
+
 	*expr.type = expr_type;
 	return expr_type;
 }
@@ -322,11 +330,19 @@ void check_body(type_t ret, type_list_t types, buffer_t(ast_statement_t) body) {
 		switch (st.kind) {
 			case AST_STATEMENT_DECL:
 				types_add(&ty, st.decl.name, st.decl.type);
+				log_trace("Declaration type: %s", type_as_string(st.decl.type));
+				def_type(st.decl.type);
 				break;
 
 			case AST_STATEMENT_SET: {}
 				type_t type_var = types_get(ty, st.set.name);
+
+				if (st.set.val.kind == AST_EXPR_GET)
+					log_error("GET LMAOOOOOO");
+				
 				type_t type_exp = type_of_expr(ty, st.set.val);
+
+				log_trace("Variable %s is type %s", st.set.name, type_as_string(type_var));
 
 				if (!type_cmp(type_var, type_exp))
 					error(1, "Variable %s is of type %s, found %s", st.set.name, type_as_string(type_var), type_as_string(type_exp));
@@ -368,6 +384,7 @@ void type_check(ast_program_t program) {
 			case AST_TL_FUNC:
 				add_func_def(tl.func);
 				break;
+			default: break;
 		}
 	}
 
@@ -381,8 +398,10 @@ void type_check(ast_program_t program) {
 
 				check_body(tl.func.ret, types, tl.func.body);
 				break;
+
+			default: break;
 		}
 	}
 
-	log_trace("End type checking");
+	log_info("End type checking");
 }

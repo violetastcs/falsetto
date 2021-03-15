@@ -41,12 +41,12 @@ typedef struct atom {
 	atom_kind_t kind;
 
 	union {
-		uint64_t integer_val;
+		int64_t integer_val;
 		double float_val;
 		char *symbol_val;
 		char *string_val;
 		buffer_t(struct atom) expr;
-	}
+	};
 } atom_t;
 
 // Check if atom is a symbol and, if name != NULL, if it is equal to the name provided
@@ -166,6 +166,9 @@ atom_t parse_item(token_t next) {
 			atom.kind = ATOM_SYMBOL;
 			atom.symbol_val = next.symbol_val;
 			break;
+
+		default:
+			error(1, "Unhandled token kind: %d", next.kind);
 	}
 
 	return atom;

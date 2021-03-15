@@ -25,7 +25,7 @@
 #include <ctype.h>
 
 // Get the size of the next UTF-8 codepoint in bytes
-uint8_t utf8_char_size(uint8_t const* c) {
+uint8_t utf8_char_size(char* c) {
 	const bool vals[] = {
 		(*c & 0b10000000) == 0b00000000,
 		(*c & 0b11100000) == 0b11000000,
@@ -42,8 +42,8 @@ uint8_t utf8_char_size(uint8_t const* c) {
 }
 
 // Extract a codepoint
-wint_t utf8_to_int(uint8_t const* c) {
-	int32_t out = *c;
+wint_t utf8_to_int(char* c) {
+	wint_t out = (wint_t)*c;
 
 	switch (utf8_char_size(c)) {
 		case 1: return out;
@@ -57,7 +57,7 @@ wint_t utf8_to_int(uint8_t const* c) {
 
 // Check if a codepoint is whitespace
 bool utf8_is_whitespace(wint_t c) {
-	return isspace(c)
+	return iswspace(c)
 		or (c >= 0x0009 and c <= 0x000d)
 		or c == 0x0020
 		or c == 0x0085

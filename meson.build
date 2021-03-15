@@ -5,4 +5,9 @@ project('falsetto', 'c', default_options: [
 	'warning_level=2',
 	'b_ndebug=if-release',
 ])
-executable('fsc', 'src/fsc.c', include_directories: ['src'])
+executable('fsc', 'src/fsc.c', include_directories: ['src'], c_args: [
+	'-Werror=conversion', 
+	'-Werror-implicit-function-declaration',
+	#'-Wpadded'
+])
+

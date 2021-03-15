@@ -165,5 +165,6 @@ bool arg_takes_int(char *arg) {
 
 // Argument takes any value
 bool arg_takes_val(char *arg) {
+	(void)arg;
 	return true;
 }

@@ -140,6 +140,7 @@ type_t type_ptr(type_t type) {
 	t.kind = TYPE_POINTER;
 	t.child = malloc(sizeof(type_t));
 	*t.child = type;
+	return t;
 }
 
 bool is_string(type_t type) {
@@ -211,7 +212,7 @@ type_t parse_type(atom_t type) {
 				if (type.expr[2].kind != ATOM_INTEGER) 
 					error(1, "Array length must be integer");
 
-				t.count = type.expr[2].integer_val;
+				t.count = (size_t)type.expr[2].integer_val;
 			} else if (is_symbol(type.expr[0], "@")) {
 				t.kind = TYPE_POINTER;
 				t.child = malloc(sizeof(type_t));
@@ -219,7 +220,13 @@ type_t parse_type(atom_t type) {
 			} else 
 				error(1, "Invalid type modifier");
 			break;
+
+		default:
+			error(1, "Type must be an expression or symbol");
+			break;
 	}
+
+	log_trace("Parsed type: %s", type_as_string(t));
 	
 	return t;
 }
@@ -294,16 +301,8 @@ typedef struct ast_expr {
 		double float_val;
 		bool bool_val;
 		buffer_t(struct ast_expr) array;
-	}
+	};
 } ast_expr_t;
-
-void ast_print_expr(ast_expr_t expr, int tabs) {
-	switch (expr.kind) {
-		case AST_EXPR_BINOP:
-			TODO("Expr printing");
-			break;
-	}
-}
 
 ast_expr_t parse_ast_expr(atom_t expr) {
 	ast_expr_t e;
@@ -549,40 +548,9 @@ typedef struct ast_statement {
 		ast_set_t set;
 		ast_decl_t decl;
 		ast_expr_t ret;
-	}
+	};
 } ast_statement_t;
 
-void ast_print_body(buffer_t(ast_statement_t) body, int tabs) {
-	if (buffer_len(body) != 0) {
-		for (size_t i = 0; i < buffer_len(body); i++) {
-			nlt(tabs);
-
-			ast_statement_t st = body[i];
-
-			switch (st.kind) {
-				case AST_STATEMENT_DECL:
-					printf("AST_STATEMENT_DECL");
-					nlt(tabs + 1);
-					printf("name = '%s'", st.decl.name);
-					nlt(tabs + 1);
-					printf("type = '%s'", type_as_string(st.decl.type));
-					break;
-				case AST_STATEMENT_SET:
-					printf("AST_STATEMENT_SET");
-					nlt(tabs + 1);
-					printf("name = '%s'", st.set.name);
-					nlt(tabs + 1);
-					printf("val:");
-					ast_print_expr(st.set.val, tabs + 2);
-					break;
-			}
-		}
-	} else {
-		nlt(tabs);
-		printf("None");
-	}
-	printf("\n");
-}
 
 buffer_t(ast_statement_t) parse_body(atom_t body) {
 	buffer_t(ast_statement_t) list = NULL;
@@ -738,26 +706,8 @@ typedef struct ast_tl {
 	union {
 		char *inc_file;
 		ast_func_t func;
-	}
+	};
 } ast_tl_t;
-
-void ast_print_tl(ast_tl_t tl) {
-	switch (tl.kind) {
-		case AST_TL_FUNC:
-			printf("AST_TL_FUNC\n");
-			printf("    name = '%s'\n", tl.func.name);
-			printf("    ret  = '%s'\n", type_as_string(tl.func.ret));
-			printf("    vararg = '%s'\n", tl.func.vararg ? "true" : "false");
-			printf("    args:");
-			ast_print_args(tl.func.args, 1);
-			printf("    body:");
-			ast_print_body(tl.func.body, 1);
-			break;
-		case AST_TL_INCLUDE:
-			printf("AST_TL_INCLUDE\n    file = '%s'", tl.inc_file);
-			break;
-	}
-}
 
 typedef struct ast_program {
 	buffer_t(ast_tl_t) items;

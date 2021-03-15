@@ -21,10 +21,13 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <errno.h>
 #include <stdarg.h>
 
 #include <utils/test.h>
 #include <utils/log.h>
+
+void error(int, char*, ...);
 
 // Print a new line and N tabs
 void nlt(int n) {
@@ -49,7 +52,7 @@ char *heap_string(char *string) {
 
 // Slice a string between start and end and place on the heap
 char *heap_string_range(char *start, char *end) {
-	size_t len = (end - start);
+	size_t len = (size_t)(end - start);
 	char *buf = malloc(len + 1);
 
 	if (buf != NULL) {
@@ -68,7 +71,7 @@ uint64_t buffer_hash(char *buf, size_t len) {
 	for (size_t i = 0; i < len; i++) {
 		c = buf[i];
 		hash *= 1099511628211;
-		hash ^= c;
+		hash ^= (uint64_t)c;
 	}
 
 	return hash;
@@ -81,7 +84,8 @@ uint64_t str_hash(char *str) {
 
 // Get the FNV-1 hash of a slice of a string
 uint64_t str_range_hash(char *start, char *end) {
-	return buffer_hash(start, end - start);
+	size_t length = (size_t)(end - start);
+	return buffer_hash(start, length);
 }
 
 test_result_t misc_test() {
@@ -103,7 +107,13 @@ test_result_t misc_test() {
 // Heap allocate a formatted string based on a varargs list
 char *vheap_fmt(char *fmt, va_list args) {
 	int size = vsnprintf(NULL, 0, fmt, args) + 1;
-	char *buf = malloc(size);
+
+	if (size < 0) {
+		int err = errno;
+		error(err, "Failed to format string '%s': %s", fmt, strerror(err));
+	}
+	
+	char *buf = malloc((size_t)size);
 	vsprintf(buf, fmt, args);
 	return buf;
 }

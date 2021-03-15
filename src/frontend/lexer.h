@@ -65,8 +65,8 @@ void lexer_init_file(char *path) {
 		error(err, "Failed to open file '%s': %s", path, strerror(err));
 	}
 
-	int length = lseek(file, 0, SEEK_END);
-	lexer_stream = mmap(0, length, PROT_READ, MAP_PRIVATE, file, 0);
+	off_t length = lseek(file, 0, SEEK_END);
+	lexer_stream = mmap(0, (size_t)length, PROT_READ, MAP_PRIVATE, file, 0);
 
 	if (lexer_stream == NULL) {
 		int err = errno;
@@ -98,7 +98,7 @@ typedef struct token {
 		int64_t int_val;
 		double float_val;
 		char *symbol_val;
-	}
+	};
 } token_t;
 
 // Parse a single token and advance
