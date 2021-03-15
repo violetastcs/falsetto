@@ -48,7 +48,7 @@ const char *log_level_name[] = {
 loglevel_t log_level_filter = LOG_INFO;
 
 // Log a message with a given level, filename, line and message
-void log_inner(loglevel_t level, char *filename, uint32_t line, char *fmt, ...) {
+void log_inner(loglevel_t level, char *filename, uint32_t line, char *func, char *fmt, ...) {
 	// Only log if the importance is above the minimum level
 	if (level >= log_level_filter) {
 		time_t rawtime;
@@ -61,10 +61,10 @@ void log_inner(loglevel_t level, char *filename, uint32_t line, char *fmt, ...) 
 		// Print time, log level, file and position within the file
 		fprintf(
 			stderr,
-			ANSI_FG_WHITE "(%0*d:%0*d:%0*d) " ANSI_RESET "%s [%s:%d]: ",
+			ANSI_FG_BLACK_BRIGHT "(%0*d:%0*d:%0*d) " ANSI_RESET "%s " ANSI_BOLD "[" ANSI_FG_CYAN_BRIGHT "%s " ANSI_RESET ANSI_BOLD "%s:%d]" ANSI_RESET ANSI_FG_WHITE,
 			2, ti->tm_hour, 2, ti->tm_min, 2, ti->tm_sec,
 			log_level_name[level],
-			filename, line
+			func, filename, line
 		);
 
 		va_list args;
@@ -79,8 +79,8 @@ void log_inner(loglevel_t level, char *filename, uint32_t line, char *fmt, ...) 
 }
 
 // Log various levels with file and position of caller attached
-#define log_trace(...) log_inner(LOG_TRACE, __FILE__, __LINE__, __VA_ARGS__)
-#define log_debug(...) log_inner(LOG_DEBUG, __FILE__, __LINE__, __VA_ARGS__)
-#define log_info(...)  log_inner(LOG_INFO,  __FILE__, __LINE__, __VA_ARGS__)
-#define log_warn(...)  log_inner(LOG_WARN,  __FILE__, __LINE__, __VA_ARGS__)
-#define log_error(...) log_inner(LOG_ERROR, __FILE__, __LINE__, __VA_ARGS__)
+#define log_trace(...) log_inner(LOG_TRACE, __FILE__, __LINE__, __func__, "\n               ⤷ " __VA_ARGS__)
+#define log_debug(...) log_inner(LOG_DEBUG, __FILE__, __LINE__, __func__, "\n               ⤷ " __VA_ARGS__)
+#define log_info(...)  log_inner(LOG_INFO,  __FILE__, __LINE__, __func__, "\n               ⤷ " __VA_ARGS__)
+#define log_warn(...)  log_inner(LOG_WARN,  __FILE__, __LINE__, __func__, "\n               ⤷ " __VA_ARGS__)
+#define log_error(...) log_inner(LOG_ERROR, __FILE__, __LINE__, __func__, "\n               ⤷ " __VA_ARGS__)

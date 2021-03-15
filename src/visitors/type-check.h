@@ -191,9 +191,6 @@ type_t type_of_call(type_list_t types, ast_call_t call) {
 type_t type_of_expr(type_list_t types, ast_expr_t expr) {
 	type_t expr_type;
 
-	if (expr.kind == AST_EXPR_GET)
-		log_error("GETGETGET");
-
 	switch (expr.kind) {
 		case AST_EXPR_SYMBOL:
 			expr_type = types_get(types, expr.symbol_val);
@@ -242,9 +239,7 @@ type_t type_of_expr(type_list_t types, ast_expr_t expr) {
 			type_t array = type_of_expr(types, *expr.get.array);
 			type_t index = type_of_expr(types, *expr.get.index);
 
-			log_info("Get from type %s to type %s", type_as_string(array), type_as_string(index));
-
-			if (array.kind != TYPE_ARRAY)
+        		if (array.kind != TYPE_ARRAY)
 				error(1, "Get expects Array, found %s", type_as_string(array));
 
 			if (!is_integer(index))
@@ -312,10 +307,7 @@ type_t type_of_expr(type_list_t types, ast_expr_t expr) {
 
 	def_type(expr_type);
 
-	if (expr.kind == AST_EXPR_GET)
-		log_info("Get type: %s", type_as_string(expr_type));
-
-	*expr.type = expr_type;
+        *expr.type = expr_type;
 	return expr_type;
 }
 
