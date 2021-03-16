@@ -76,7 +76,6 @@ type_list_t types_cat(type_list_t first, type_list_t second) {
 
 	return new;
 }
-
 type_list_t types_clone(type_list_t list) {
 	type_list_t new = NULL;
 
@@ -137,7 +136,8 @@ char *array_gen(type_t type) {
 }
 
 void def_type(type_t type) {
-	if (type.kind == TYPE_ARRAY) {
+	if (type.kind == TYPE_ARRAY and !is_partial(*type.child)) {
+		
 		char *mangled = type_mangle(type);
 		uint64_t hash = str_hash(mangled);
 		bool found = false;
@@ -172,7 +172,7 @@ type_t type_of_call(type_list_t types, ast_call_t call) {
 	for (size_t i = 0; i < argp; i++) {
 		type_t type = type_of_expr(types, call.args[i]);
 
-		if (!type_cmp(type, info.args[i]) && i < argc) {
+		if (!type_coerces(type, info.args[i]) && i < argc) {
 			error(
 				1, 
 				"Argument %d for %s expected %s, found %s", 
@@ -204,7 +204,7 @@ type_t type_of_expr(type_list_t types, ast_expr_t expr) {
 			expr_type = t;
 			break;
 		case AST_EXPR_INTEGER:
-			expr_type = type_kind(TYPE_I64);
+			expr_type = type_kind(TYPE_INTEGER);
 			break;
 		case AST_EXPR_FLOAT:
 			TODO("Implement floating point values");
@@ -222,7 +222,7 @@ type_t type_of_expr(type_list_t types, ast_expr_t expr) {
 
 			for (size_t i = 1; i < buffer_len(expr.array); i++) {
 				type_t typei = type_of_expr(types, expr.array[i]);
-				if (!type_cmp(typei, type1))
+				if (!type_coerces(typei, type1))
 					error(1, "Item %ld of array expected '%s', found '%s'", i, type_as_string(type1), type_as_string(typei));
 			}
 
@@ -252,7 +252,7 @@ type_t type_of_expr(type_list_t types, ast_expr_t expr) {
 			switch (expr.unop.kind) {
 				case AST_UNOP_NOT: {}
 					type_t type = type_of_expr(types, *expr.unop.arg);
-					if (!type_cmp(type, type_kind(TYPE_BOOL)))
+					if (!type_coerces(type, type_kind(TYPE_BOOL)))
 						error(1, "not expects Bool, found %s", type_as_string(type));
 
 					expr_type = type;
@@ -266,7 +266,7 @@ type_t type_of_expr(type_list_t types, ast_expr_t expr) {
 			type_t lhs = type_of_expr(types, *expr.binop.args[0]);
 			type_t rhs = type_of_expr(types, *expr.binop.args[1]);
 
-			if (!type_cmp(lhs, rhs)) 
+			if (!type_coerces(lhs, rhs)) 
 				error(1, "Operands to binary expression must be of the same type");
 
 			switch (expr.binop.kind) {
@@ -293,9 +293,9 @@ type_t type_of_expr(type_list_t types, ast_expr_t expr) {
 
 				case AST_BINOP_AND:
 				case AST_BINOP_OR:
-					if (!type_cmp(lhs, type_kind(TYPE_BOOL)))
+					if (!type_coerces(lhs, type_kind(TYPE_BOOL)))
 						error(1, "Boolean operator expected Bool, found %s", type_as_string(lhs));
-					if (!type_cmp(rhs, type_kind(TYPE_BOOL)))
+					if (!type_coerces(rhs, type_kind(TYPE_BOOL)))
 						error(1, "Boolean operator expected Bool, found %s", type_as_string(rhs));
 
 					expr_type = type_kind(TYPE_BOOL);
@@ -331,15 +331,17 @@ void check_body(type_t ret, type_list_t types, buffer_t(ast_statement_t) body) {
 
 				log_trace("Variable %s is type %s", st.set.name, type_as_string(type_var));
 
-				if (!type_cmp(type_var, type_exp))
+				if (!type_coerces(type_var, type_exp))
 					error(1, "Variable %s is of type %s, found %s", st.set.name, type_as_string(type_var), type_as_string(type_exp));
+				else 
+					*st.set.val.type = type_var;
 
 				break;
 
 			case AST_STATEMENT_CFLOW: {}
 				type_t type_flw = type_of_expr(ty, st.cflow.cond);
 
-				if (!type_cmp(type_flw, type_kind(TYPE_BOOL)))
+				if (!type_coerces(type_flw, type_kind(TYPE_BOOL)))
 					error(1, "Control flow condition expected bool, found %s", type_as_string(type_flw));
 
 				check_body(ret, ty, st.cflow.body);
@@ -348,7 +350,7 @@ void check_body(type_t ret, type_list_t types, buffer_t(ast_statement_t) body) {
 			case AST_STATEMENT_RETURN: {}
 				type_t type_ret = type_of_expr(ty, st.ret);
 
-				if (!type_cmp(type_ret, ret))
+				if (!type_coerces(ret, type_ret))
 					error(1, "Expected return type %s, found %s", type_as_string(ret), type_as_string(type_ret));
 
 				break;
@@ -389,6 +391,8 @@ void type_check(ast_program_t program) {
 			default: break;
 		}
 	}
+
+	assert(!type_coerces(type_kind(TYPE_U8), type_kind(TYPE_I32)));
 
 	log_info("End type checking");
 }

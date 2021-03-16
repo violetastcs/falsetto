@@ -48,7 +48,7 @@ const char *log_level_name[] = {
 loglevel_t log_level_filter = LOG_INFO;
 
 // Log a message with a given level, filename, line and message
-void log_inner(loglevel_t level, char *filename, uint32_t line, char *func, char *fmt, ...) {
+void log_inner(loglevel_t level, const char *filename, uint32_t line, const char *func, char *fmt, ...) {
 	// Only log if the importance is above the minimum level
 	if (level >= log_level_filter) {
 		time_t rawtime;

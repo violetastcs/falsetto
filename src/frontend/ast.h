@@ -28,6 +28,8 @@
 #include <frontend/parser.h>
 
 typedef enum type_kind {
+	TYPE_INTEGER,
+	
 	TYPE_I8,
 	TYPE_U8,
 
@@ -69,6 +71,8 @@ char *type_str_lang[] = {
 	[TYPE_I32] = "I32",
 	[TYPE_U64] = "U64",
 	[TYPE_I64] = "I64",
+
+	[TYPE_INTEGER] = "{Integer}",
 
 	[TYPE_BOOL] = "Bool",
 	[TYPE_VOID] = "Void",
@@ -116,6 +120,56 @@ char *type_to_str(type_t type) {
 	}
 }
 
+bool type_coerces(type_t to, type_t from) {
+	switch (to.kind) {
+		case TYPE_I8:
+		case TYPE_U8:
+		case TYPE_I16:
+		case TYPE_U16:
+		case TYPE_I32:
+		case TYPE_U32:
+		case TYPE_I64:
+		case TYPE_U64:
+		case TYPE_INTEGER:
+			return from.kind == TYPE_INTEGER or from.kind == to.kind; 
+			break;
+
+		case TYPE_ARRAY:
+			if (from.kind == TYPE_ARRAY and to.count == from.count)
+				return type_coerces(*to.child, *from.child);
+			else 
+				return false;
+			break;
+
+		case TYPE_POINTER:
+			if (from.kind == TYPE_POINTER)
+				return type_coerces(*to.child, *from.child);
+			else
+				return false;
+			break;
+
+		default:
+			return to.kind == from.kind;
+			break;
+	}
+}
+
+bool is_partial(type_t type) {
+	switch (type.kind) {
+		case TYPE_INTEGER:
+			return true;
+
+		case TYPE_POINTER:
+		case TYPE_ARRAY:
+			return is_partial(*type.child);
+
+		default:
+			return false;
+	}
+	
+	return type.kind == TYPE_INTEGER;
+}
+
 bool is_integer(type_t type) {
 	return 
 		   type.kind == TYPE_I8
@@ -126,6 +180,7 @@ bool is_integer(type_t type) {
 		or type.kind == TYPE_U32
 		or type.kind == TYPE_I64
 		or type.kind == TYPE_U64
+		or type.kind == TYPE_INTEGER
 	;
 }
 
