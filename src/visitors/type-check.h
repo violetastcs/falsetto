@@ -217,6 +217,14 @@ type_t type_of_expr(type_list_t types, ast_expr_t expr) {
 			expr_type = type_of_call(types, expr.call);
 			break;
 
+		case AST_EXPR_CAST: {}
+			type_t from = type_of_expr(types, *expr.cast.from);
+			if (!type_casts(expr.cast.to, from))
+				error(1, "Cannot cast from type %s to type %s", type_as_string(from), type_as_string(expr.cast.to));
+			expr_type = expr.cast.to;
+		
+			break;
+
 		case AST_EXPR_ARRAY: {}
 			type_t type1 = type_of_expr(types, expr.array[0]);
 

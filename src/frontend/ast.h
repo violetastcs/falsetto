@@ -120,6 +120,57 @@ char *type_to_str(type_t type) {
 	}
 }
 
+
+bool is_partial(type_t type) {
+	switch (type.kind) {
+		case TYPE_INTEGER:
+			return true;
+
+		case TYPE_POINTER:
+		case TYPE_ARRAY:
+			return is_partial(*type.child);
+
+		default:
+			return false;
+	}
+	
+	return type.kind == TYPE_INTEGER;
+}
+
+bool is_integer(type_t type) {
+	return 
+		   type.kind == TYPE_I8
+		or type.kind == TYPE_U8
+		or type.kind == TYPE_I16
+		or type.kind == TYPE_U16
+		or type.kind == TYPE_I32
+		or type.kind == TYPE_U32
+		or type.kind == TYPE_I64
+		or type.kind == TYPE_U64
+		or type.kind == TYPE_INTEGER
+	;
+}
+bool type_casts(type_t to, type_t from) {
+	if (to.kind == from.kind)
+		return true;
+
+	switch (to.kind) {
+		case TYPE_I8:
+		case TYPE_U8:
+		case TYPE_I16:
+		case TYPE_U16:
+		case TYPE_I32:
+		case TYPE_U32:
+		case TYPE_I64:
+		case TYPE_U64:
+		case TYPE_INTEGER:
+			return is_integer(from);
+
+		default:
+			return false;
+	}
+}
+
 bool type_coerces(type_t to, type_t from) {
 	switch (to.kind) {
 		case TYPE_I8:
@@ -152,36 +203,6 @@ bool type_coerces(type_t to, type_t from) {
 			return to.kind == from.kind;
 			break;
 	}
-}
-
-bool is_partial(type_t type) {
-	switch (type.kind) {
-		case TYPE_INTEGER:
-			return true;
-
-		case TYPE_POINTER:
-		case TYPE_ARRAY:
-			return is_partial(*type.child);
-
-		default:
-			return false;
-	}
-	
-	return type.kind == TYPE_INTEGER;
-}
-
-bool is_integer(type_t type) {
-	return 
-		   type.kind == TYPE_I8
-		or type.kind == TYPE_U8
-		or type.kind == TYPE_I16
-		or type.kind == TYPE_U16
-		or type.kind == TYPE_I32
-		or type.kind == TYPE_U32
-		or type.kind == TYPE_I64
-		or type.kind == TYPE_U64
-		or type.kind == TYPE_INTEGER
-	;
 }
 
 type_t type_kind(type_kind_t kind) {
@@ -328,6 +349,11 @@ typedef struct ast_get {
 	struct ast_expr *index;
 } ast_get_t;
 
+typedef struct ast_cast {
+	type_t to;
+	struct ast_expr *from;
+} ast_cast_t;
+
 typedef enum ast_expr_kind {
 	AST_EXPR_BINOP,
 	AST_EXPR_UNIOP,
@@ -338,7 +364,8 @@ typedef enum ast_expr_kind {
 	AST_EXPR_BOOL,
 	AST_EXPR_ARRAY,
 	AST_EXPR_GET,
-	AST_EXPR_CALL
+	AST_EXPR_CALL,
+	AST_EXPR_CAST
 } ast_expr_kind_t;
 
 typedef struct ast_expr {
@@ -350,6 +377,7 @@ typedef struct ast_expr {
 		ast_unop_t unop;
 		ast_call_t call;
 		ast_get_t get;
+		ast_cast_t cast;
 		int64_t int_val;
 		char *string_val;
 		char *symbol_val;
@@ -546,6 +574,14 @@ ast_expr_t parse_ast_expr(atom_t expr) {
 
 				*e.get.array = parse_ast_expr(expr.expr[1]);
 				*e.get.index = parse_ast_expr(expr.expr[2]);
+
+			} else if (strcmp(op, "cast") == 0 ) {
+				e.kind = AST_EXPR_CAST;
+
+				e.cast.from = malloc(sizeof(ast_expr_t));
+
+				*e.cast.from = parse_ast_expr(expr.expr[1]);
+				e.cast.to    = parse_type(expr.expr[2]);
 				
 			} else {
 				e.kind = AST_EXPR_CALL;

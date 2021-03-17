@@ -1,4 +1,4 @@
-(func printf [ (fmt (@ U8)) ... ] Void)
+(func printf [ (fmt (@ U8)) ... ] I32)
 
 (func hello [(name (@ U8))] Void {
 	(printf "Hello, %s!\n" name)
@@ -34,6 +34,14 @@
 		(printf "a[%d] = %ld\n" j (get a j))
 		(set j (+ j 1))
 	})
+
+	(decl test_to I32)
+	(decl test_from U8)
+
+	(set test_from 10)
+	(set test_to (cast test_from I32))
+
+	(printf "Casted: %d\n" test_to)
 
 	(return 0)
 })

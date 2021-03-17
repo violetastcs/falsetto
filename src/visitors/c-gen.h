@@ -137,6 +137,19 @@ void compile_expr(FILE *outp, ast_expr_t expr) {
 			fputc(')', outp);
 
 			break;
+
+		case AST_EXPR_CAST:
+			log_trace("Compiling cast expression (AST_EXPR_CAST)");
+
+			type_t to = expr.cast.to;
+			ast_expr_t from = *expr.cast.from;
+
+			fputc('(', outp);
+			fputs(type_to_str(to), outp);
+			fputc(')', outp);
+			compile_expr(outp, from);
+			
+			break;
 	
 		case AST_EXPR_CALL:
 			compile_call(outp, expr.call);
