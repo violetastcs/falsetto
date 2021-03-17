@@ -1,47 +1,14 @@
 (func printf [ (fmt (@ U8)) ... ] I32)
 
-(func hello [(name (@ U8))] Void {
-	(printf "Hello, %s!\n" name)
+(func print_i64 [ (i I64) ] Void {
+	(printf "%ld" i)
 })
 
-(func main [(argc I32) (argv (@ (@ U8)))] I32 {
-	(decl test I32)
-	(set test 2)
-	(set test (+ test 2))
+(func main [(argc I32) (argv (@ (@ I8)))] I32 {
+	(decl x I64)
+	(set x 10)
 
-	(if [= argc 1] {
-		(hello "Turing Tarpit")
-		(printf "Value: %d\n" test)
-	})
-
-	(decl i I32)
-	(set i 0)
-
-	(while [< i 10] {
-		(printf "I: %d\n" i)
-		(set i (+ i 1))
-	})
-
-	(printf "%d %d %d\n" 1 2 3)
-
-	(decl j I32)
-	(set j 0)
-
-	(decl a (Array I64 4))
-	(set a (array 1 2 3 4))
-
-	(while [< j 4] {
-		(printf "a[%d] = %ld\n" j (get a j))
-		(set j (+ j 1))
-	})
-
-	(decl test_to I32)
-	(decl test_from U8)
-
-	(set test_from 10)
-	(set test_to (cast test_from I32))
-
-	(printf "Casted: %d\n" test_to)
-
+	(print_i64 x)
+		
 	(return 0)
 })

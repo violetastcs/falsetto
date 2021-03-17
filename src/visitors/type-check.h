@@ -48,13 +48,15 @@ void types_add(type_list_t *list, char *name, type_t type) {
 }
 
 type_t types_get(type_list_t list, char *name) {
+	log_trace("Get type of %s", name);
+
 	type_t t;
 	t.kind = TYPE_VOID;
 
 	uint64_t hash = str_hash(name);
 	
 	for (size_t i = 0; i < buffer_len(list); i++) {
-		item_type_info_t info = list[buffer_len(list) - i - 1];
+		item_type_info_t info = list[i];
 
 		if (info.hash == hash) {
 			t = info.type;
@@ -124,8 +126,8 @@ func_type_info_t get_func_def(char *name) {
 
 char *array_template = 
 	"typedef struct{%s inner[%ld];}%s;"
-	"%s get%s(%s a,int i){"
-		"return a.inner[i];"
+	"%s *aref%s(%s *a,long long int i){"
+		"return (a->inner + i);"
 	"}"
 ;
 
@@ -196,13 +198,14 @@ type_t type_of_expr(type_list_t types, ast_expr_t expr) {
 			expr_type = types_get(types, expr.symbol_val);
 			log_trace("Symbol %s is type %s", expr.symbol_val, type_as_string(expr_type));
 			break;
-		case AST_EXPR_STRING: {}
+		case AST_EXPR_STRING: {
 			type_t t;
 			t.kind = TYPE_POINTER;
 			t.child = malloc(sizeof(type_t));
 			*t.child = type_kind(TYPE_U8);
 			expr_type = t;
 			break;
+		}
 		case AST_EXPR_INTEGER:
 			expr_type = type_kind(TYPE_INTEGER);
 			break;
@@ -213,19 +216,21 @@ type_t type_of_expr(type_list_t types, ast_expr_t expr) {
 			expr_type = type_kind(TYPE_BOOL);
 			break;
 
-		case AST_EXPR_CALL: {}
+		case AST_EXPR_CALL: {
 			expr_type = type_of_call(types, expr.call);
 			break;
+		}
 
-		case AST_EXPR_CAST: {}
+		case AST_EXPR_CAST: {
 			type_t from = type_of_expr(types, *expr.cast.from);
 			if (!type_casts(expr.cast.to, from))
 				error(1, "Cannot cast from type %s to type %s", type_as_string(from), type_as_string(expr.cast.to));
 			expr_type = expr.cast.to;
 		
 			break;
+		}
 
-		case AST_EXPR_ARRAY: {}
+		case AST_EXPR_ARRAY: {
 			type_t type1 = type_of_expr(types, expr.array[0]);
 
 			for (size_t i = 1; i < buffer_len(expr.array); i++) {
@@ -242,19 +247,42 @@ type_t type_of_expr(type_list_t types, ast_expr_t expr) {
 
 			expr_type = arr;
 			break;
+		}
 
-		case AST_EXPR_GET: {}
-			type_t array = type_of_expr(types, *expr.get.array);
-			type_t index = type_of_expr(types, *expr.get.index);
+		case AST_EXPR_GET: {
+			type_t ptr = type_of_expr(types, *expr.get.ptr);
 
-        		if (array.kind != TYPE_ARRAY)
-				error(1, "Get expects Array, found %s", type_as_string(array));
+        		if (ptr.kind != TYPE_POINTER)
+				error(1, "Get expects pointer, found %s", type_as_string(ptr));
+
+			expr_type = *ptr.child;
+			break;
+		}
+
+
+		case AST_EXPR_REF: {
+			type_t var = types_get(types, expr.ref.var);
+
+			if (var.kind == TYPE_VOID)
+				error(1, "Variable %s not found", expr.ref.var);
+
+			expr_type = type_ptr(var);
+			break;
+		}
+
+		case AST_EXPR_AREF: {
+			type_t array = type_of_expr(types, *expr.aref.array);
+			type_t index = type_of_expr(types, *expr.aref.index);
+
+			if (array.kind != TYPE_ARRAY)
+				error(1, "Aref expects Array, found %s", type_as_string(array));
 
 			if (!is_integer(index))
-				error(1, "Get expects index  to be integer, found %s", type_as_string(index));
+				error(1, "Aref expects integer index, found %s", type_as_string(index));
 
-			expr_type = *array.child;
+			expr_type = type_ptr(*array.child);
 			break;
+		}
 
 		case AST_EXPR_UNIOP:
 			switch (expr.unop.kind) {
@@ -326,7 +354,11 @@ void check_body(type_t ret, type_list_t types, buffer_t(ast_statement_t) body) {
 		ast_statement_t st = body[i];
 
 		switch (st.kind) {
-			case AST_STATEMENT_DECL:
+			case AST_STATEMENT_DECL: {}
+				type_t exists = types_get(&ty, st.decl.name);
+				if (exists.kind != TYPE_VOID)
+					error(1, "Attempted to redeclare variable %s", st.decl.name);
+				
 				types_add(&ty, st.decl.name, st.decl.type);
 				log_trace("Declaration type: %s", type_as_string(st.decl.type));
 				def_type(st.decl.type);
@@ -346,6 +378,19 @@ void check_body(type_t ret, type_list_t types, buffer_t(ast_statement_t) body) {
 
 				break;
 
+			case AST_STATEMENT_LET: {
+				type_t exists = types_get(&ty, st.let.name);
+				//type_t exists;
+				if (exists.kind != TYPE_VOID)
+					error(1, "Attempted to redeclare variable %s", st.let.name);
+
+				type_t expr = type_of_expr(ty, st.let.val);
+				types_add(&ty, st.let.name, expr);
+				log_trace("Let type: %s", type_as_string(expr));
+				def_type(expr);
+				break;
+			}
+
 			case AST_STATEMENT_CFLOW: {}
 				type_t type_flw = type_of_expr(ty, st.cflow.cond);
 
@@ -354,6 +399,19 @@ void check_body(type_t ret, type_list_t types, buffer_t(ast_statement_t) body) {
 
 				check_body(ret, ty, st.cflow.body);
 				break;
+
+			case AST_STATEMENT_STORE: {
+				type_t ptr = type_of_expr(ty, st.store.ptr);
+				type_t val = type_of_expr(ty, st.store.val);
+
+				if (ptr.kind != TYPE_POINTER)
+					error(1, "Store expects pointer, found %s", type_as_string(ptr));
+
+				if (!type_coerces(*ptr.child, val ))
+					error(1, "Store expected %s, found %s", type_as_string(*ptr.child), type_as_string(val));
+
+				break;
+			}
 
 			case AST_STATEMENT_RETURN: {}
 				type_t type_ret = type_of_expr(ty, st.ret);

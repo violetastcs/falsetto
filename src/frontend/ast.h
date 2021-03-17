@@ -344,15 +344,23 @@ typedef struct ast_call {
 	buffer_t(struct ast_expr) args;
 } ast_call_t;
 
-typedef struct ast_get {
-	struct ast_expr *array;
-	struct ast_expr *index;
-} ast_get_t;
-
 typedef struct ast_cast {
 	type_t to;
 	struct ast_expr *from;
 } ast_cast_t;
+
+typedef struct ast_get {
+	struct ast_expr *ptr;
+} ast_get_t;
+
+typedef struct ast_aref {
+	struct ast_expr *array;
+	struct ast_expr *index;
+} ast_aref_t;
+
+typedef struct ast_ref {
+	char *var;
+} ast_ref_t;
 
 typedef enum ast_expr_kind {
 	AST_EXPR_BINOP,
@@ -364,7 +372,9 @@ typedef enum ast_expr_kind {
 	AST_EXPR_BOOL,
 	AST_EXPR_ARRAY,
 	AST_EXPR_GET,
+	AST_EXPR_AREF,
 	AST_EXPR_CALL,
+	AST_EXPR_REF,
 	AST_EXPR_CAST
 } ast_expr_kind_t;
 
@@ -376,8 +386,11 @@ typedef struct ast_expr {
 		ast_binop_t binop;
 		ast_unop_t unop;
 		ast_call_t call;
-		ast_get_t get;
 		ast_cast_t cast;
+		ast_get_t get;
+		ast_aref_t aref;
+		ast_ref_t ref;
+		char *ref_to;
 		int64_t int_val;
 		char *string_val;
 		char *symbol_val;
@@ -569,12 +582,27 @@ ast_expr_t parse_ast_expr(atom_t expr) {
 			} else if (strcmp(op, "get") == 0) {
 				e.kind = AST_EXPR_GET;
 
-				e.get.array = malloc(sizeof(ast_expr_t));
-				e.get.index = malloc(sizeof(ast_expr_t));
+				e.get.ptr = malloc(sizeof(ast_expr_t));
 
-				*e.get.array = parse_ast_expr(expr.expr[1]);
-				*e.get.index = parse_ast_expr(expr.expr[2]);
+				*e.get.ptr = parse_ast_expr(expr.expr[1]);
 
+			}  else if (strcmp(op, "ref") == 0) {
+				e.kind = AST_EXPR_REF;
+
+				if (expr.expr[1].kind != ATOM_SYMBOL)
+					error(1, "ref expressions expects symbol");
+
+				e.ref.var = expr.expr[1].symbol_val;
+
+			} else if (strcmp(op, "aref") == 0) {
+				e.kind = AST_EXPR_AREF;
+
+				e.aref.array = malloc(sizeof(ast_expr_t));
+				e.aref.index = malloc(sizeof(ast_expr_t));
+
+				*e.aref.array = parse_ast_expr(expr.expr[1]);
+				*e.aref.index = parse_ast_expr(expr.expr[2]);
+				
 			} else if (strcmp(op, "cast") == 0 ) {
 				e.kind = AST_EXPR_CAST;
 
@@ -582,7 +610,7 @@ ast_expr_t parse_ast_expr(atom_t expr) {
 
 				*e.cast.from = parse_ast_expr(expr.expr[1]);
 				e.cast.to    = parse_type(expr.expr[2]);
-				
+
 			} else {
 				e.kind = AST_EXPR_CALL;
 				e.call.name = op;
@@ -622,11 +650,23 @@ typedef struct ast_decl {
 	type_t type;
 } ast_decl_t;
 
+typedef struct ast_let {
+	char *name;
+	ast_expr_t val;
+} ast_let_t;
+
+typedef struct ast_store {
+	ast_expr_t ptr;
+	ast_expr_t val;
+} ast_store_t;
+
 typedef enum ast_statement_kind {
 	AST_STATEMENT_DECL,
 	AST_STATEMENT_SET,
+	AST_STATEMENT_LET,
 	AST_STATEMENT_CFLOW,
 	AST_STATEMENT_RETURN,
+	AST_STATEMENT_STORE,
 	AST_STATEMENT_CALL
 } ast_statement_kind_t;
 
@@ -637,8 +677,10 @@ typedef struct ast_statement {
 		ast_cflow_t cflow;
 		ast_call_t call;
 		ast_set_t set;
+		ast_let_t let;
 		ast_decl_t decl;
 		ast_expr_t ret;
+		ast_store_t store;
 	};
 } ast_statement_t;
 
@@ -683,6 +725,18 @@ buffer_t(ast_statement_t) parse_body(atom_t body) {
 			st.set.name = atom.expr[1].symbol_val;
 			st.set.val  = parse_ast_expr(atom.expr[2]);
 
+		} else if (strcmp(symbol, "let") == 0) {
+			if (buffer_len(atom.expr) != 3)
+				error(1, "Invalid argument count for let");
+
+			st.kind = AST_STATEMENT_LET;
+
+			if (!is_symbol(atom.expr[1], NULL)) 
+				error(1, "Variable identifier must be a symbol");
+
+			st.let.name = atom.expr[1].symbol_val;
+			st.let.val  = parse_ast_expr(atom.expr[2]);
+
 		} else if (strcmp(symbol, "return") == 0) {
 			if (buffer_len(atom.expr) != 2)
 				error(1, "Invalid argument count for set");
@@ -710,6 +764,15 @@ buffer_t(ast_statement_t) parse_body(atom_t body) {
 			st.cflow.kind = AST_CFLOW_WHILE;
 			st.cflow.cond = parse_ast_expr(atom.expr[1]);
 			st.cflow.body = parse_body(atom.expr[2]);
+
+		} else if (strcmp(symbol, "store") == 0) {
+			if (buffer_len(atom.expr) != 3)
+				error(1, "Invalid argument count for store");
+
+			st.kind = AST_STATEMENT_STORE;
+
+			st.store.ptr = parse_ast_expr(atom.expr[1]);
+			st.store.val = parse_ast_expr(atom.expr[2]);
 
 		} else {
 			st.kind = AST_STATEMENT_CALL;

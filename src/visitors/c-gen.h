@@ -127,13 +127,32 @@ void compile_expr(FILE *outp, ast_expr_t expr) {
 		case AST_EXPR_GET:
 			log_trace("Compiling get expression (AST_EXPR_GET");
 
-			ast_expr_t array = *expr.get.array;
-			ast_expr_t index = *expr.get.index;
+			ast_expr_t ptr = *expr.get.ptr;
 
-			fprintf(outp, "get%s(", type_mangle(*array.type));
-			compile_expr(outp, array);
+			fputs("(*", outp);
+			compile_expr(outp, ptr);
+			fputc(')', outp);
+
+			break;
+
+		case AST_EXPR_REF:
+			log_trace("Compiling ref expression (AST_EXPR_REF)");
+
+			fprintf(outp, "(&%s)", expr.ref.var);
+
+			break;
+
+		case AST_EXPR_AREF:
+			log_trace("Compiling aref expression (AST_EXPR_AREF)");
+
+			type_t type = *expr.aref.array->type;
+
+			fprintf(outp, "aref%s(&", type_mangle(type));
+			//fputc('(', outp);
+			compile_expr(outp, *expr.aref.array);
 			fputc(',', outp);
-			compile_expr(outp, index);
+			//fputs(".inner+", outp);
+			compile_expr(outp, *expr.aref.index);
 			fputc(')', outp);
 
 			break;
@@ -186,6 +205,16 @@ void compile_statement(FILE *outp, ast_statement_t st) {
 				compile_statement(outp, st.cflow.body[i]);
 
 			fputc('}', outp);
+			break;
+
+		case AST_STATEMENT_STORE:
+			log_trace("Compiling store statement (AST_STATEMENT_STORE)");
+
+			fprintf(outp, "*");
+			compile_expr(outp, st.store.ptr);
+			fprintf(outp, "=");
+			compile_expr(outp, st.store.val);
+			fprintf(outp, ";");
 			break;
 
 		case AST_STATEMENT_RETURN:
