@@ -150,60 +150,6 @@ bool is_integer(type_t type) {
 		or type.kind == TYPE_INTEGER
 	;
 }
-bool type_casts(type_t to, type_t from) {
-	if (to.kind == from.kind)
-		return true;
-
-	switch (to.kind) {
-		case TYPE_I8:
-		case TYPE_U8:
-		case TYPE_I16:
-		case TYPE_U16:
-		case TYPE_I32:
-		case TYPE_U32:
-		case TYPE_I64:
-		case TYPE_U64:
-		case TYPE_INTEGER:
-			return is_integer(from);
-
-		default:
-			return false;
-	}
-}
-
-bool type_coerces(type_t to, type_t from) {
-	switch (to.kind) {
-		case TYPE_I8:
-		case TYPE_U8:
-		case TYPE_I16:
-		case TYPE_U16:
-		case TYPE_I32:
-		case TYPE_U32:
-		case TYPE_I64:
-		case TYPE_U64:
-		case TYPE_INTEGER:
-			return from.kind == TYPE_INTEGER or from.kind == to.kind; 
-			break;
-
-		case TYPE_ARRAY:
-			if (from.kind == TYPE_ARRAY and to.count == from.count)
-				return type_coerces(*to.child, *from.child);
-			else 
-				return false;
-			break;
-
-		case TYPE_POINTER:
-			if (from.kind == TYPE_POINTER)
-				return type_coerces(*to.child, *from.child);
-			else
-				return false;
-			break;
-
-		default:
-			return to.kind == from.kind;
-			break;
-	}
-}
 
 type_t type_kind(type_kind_t kind) {
 	type_t t;

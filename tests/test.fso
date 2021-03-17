@@ -4,11 +4,11 @@
 	(printf "%ld" i)
 })
 
-(func main [(argc I32) (argv (@ (@ I8)))] I32 {
-	(decl x I64)
-	(set x 10)
+(func main [ (argc I32) (argv (@ (@ I8))) ] I32 {
+	(let x 10)
 
 	(print_i64 x)
 		
 	(return 0)
 })
+

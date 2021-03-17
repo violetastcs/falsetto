@@ -195,6 +195,14 @@ void compile_statement(FILE *outp, ast_statement_t st) {
 			fputc(';', outp);
 			break;
 
+		case AST_STATEMENT_LET:
+			log_trace("Compiling let statement (AST_STATEMENT_LET): name = '%s'%", st.let.name);
+
+			fprintf(outp, "%s %s=", type_to_str(*st.let.val.type), st.let.name);
+			compile_expr(outp, st.let.val);
+			fputc(';', outp);
+			break;
+
 		case AST_STATEMENT_CFLOW:
 			log_trace("Compiling control flow statement (AST_STATEMENT_CFLOW): kind = '%s'", cflows[st.cflow.kind]);
 			fprintf(outp, "%s(", cflows[st.cflow.kind]);

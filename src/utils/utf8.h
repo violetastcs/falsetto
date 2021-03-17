@@ -27,10 +27,10 @@
 // Get the size of the next UTF-8 codepoint in bytes
 uint8_t utf8_char_size(char* c) {
 	const bool vals[] = {
-		(*c & 0b10000000) == 0b00000000,
-		(*c & 0b11100000) == 0b11000000,
-		(*c & 0b11110000) == 0b11100000,
-		(*c & 0b11111000) == 0b11110000,
+		(*c & 0x80) == 0x00,
+		(*c & 0xe0) == 0xc0,
+		(*c & 0xf0) == 0xe0,
+		(*c & 0xf8) == 0xf0,
 	};
 
 	uint8_t out = 0;
@@ -47,9 +47,9 @@ wint_t utf8_to_int(char* c) {
 
 	switch (utf8_char_size(c)) {
 		case 1: return out;
-		case 2: return ((out & 31) << 6)  | (c[1]  & 63);
-		case 3: return ((out & 15) << 12) | ((c[1] & 63) << 6)  | (c[2]  & 63);
-		case 4: return ((out & 7) << 18)  | ((c[1] & 63) << 12) | ((c[2] & 63) << 6) | (c[3] & 63);
+		case 2: return ((out & 31u) << 6u)  | ((uint32_t)c[1]  & 63u);
+		case 3: return ((out & 15u) << 12u) | (((uint32_t)c[1] & 63u) << 6u)  | ((uint32_t)c[2]  & 63u);
+		case 4: return ((out & 7u)  << 18u) | (((uint32_t)c[1] & 63u) << 12u) | (((uint32_t)c[2] & 63u) << 6u) | ((uint32_t)c[3] & 63u);
 	}
 
 	return 0;

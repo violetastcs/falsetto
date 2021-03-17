@@ -67,6 +67,89 @@ type_t types_get(type_list_t list, char *name) {
 	return t;
 }
 
+item_type_info_t *types_getp(type_list_t list, char *name) {
+	uint64_t hash = str_hash(name);
+	
+	for (size_t i = 0; i < buffer_len(list); i++) {
+		item_type_info_t info = list[i];
+
+		if (info.hash == hash) {
+			return list + i;;
+		}
+	}
+
+	return NULL;
+}
+
+bool type_casts(type_t to, type_t from) {
+	if (to.kind == from.kind)
+		return true;
+
+	switch (to.kind) {
+		case TYPE_I8:
+		case TYPE_U8:
+		case TYPE_I16:
+		case TYPE_U16:
+		case TYPE_I32:
+		case TYPE_U32:
+		case TYPE_I64:
+		case TYPE_U64:
+		case TYPE_INTEGER:
+			return is_integer(from);
+
+		default:
+			return false;
+	}
+}
+
+bool type_coerces(type_t to, type_t from, type_list_t *list, char *symbol_name) {
+	bool coerces;
+	
+	switch (to.kind) {
+		case TYPE_I8:
+		case TYPE_U8:
+		case TYPE_I16:
+		case TYPE_U16:
+		case TYPE_I32:
+		case TYPE_U32:
+		case TYPE_I64:
+		case TYPE_U64:
+		case TYPE_INTEGER:
+			coerces = from.kind == TYPE_INTEGER or from.kind == to.kind; 
+			break;
+
+		case TYPE_ARRAY:
+			if (from.kind == TYPE_ARRAY and to.count == from.count)
+				coerces = type_coerces(*to.child, *from.child, list, symbol_name);
+			else 
+				coerces = false;
+			break;
+
+		case TYPE_POINTER:
+			if (from.kind == TYPE_POINTER)
+				coerces = type_coerces(*to.child, *from.child, list, symbol_name);
+			else
+				coerces = false;
+			break;
+
+		default:
+			coerces = to.kind == from.kind;
+			break;
+	}
+
+	if (coerces && symbol_name != NULL) {
+		assert(list != NULL);
+		item_type_info_t *i = types_getp(*list, symbol_name);
+
+		if (i == NULL)
+			error(1, "Variable %s not found");
+
+		i->type = to;
+	}
+
+	return coerces;
+}
+
 type_list_t types_cat(type_list_t first, type_list_t second) {
 	type_list_t new = NULL;
 
@@ -157,9 +240,9 @@ void def_type(type_t type) {
 	}
 }
 
-type_t type_of_expr(type_list_t types, ast_expr_t expr);
+type_t type_of_expr(type_list_t *types, ast_expr_t expr);
 
-type_t type_of_call(type_list_t types, ast_call_t call) {
+type_t type_of_call(type_list_t *types, ast_call_t call) {
 	func_type_info_t info = get_func_def(call.name);
 
 	if (info.hash == 0)
@@ -174,7 +257,11 @@ type_t type_of_call(type_list_t types, ast_call_t call) {
 	for (size_t i = 0; i < argp; i++) {
 		type_t type = type_of_expr(types, call.args[i]);
 
-		if (!type_coerces(type, info.args[i]) && i < argc) {
+		char *symb = NULL;
+		if (call.args[i].kind == AST_EXPR_SYMBOL)
+			symb = call.args[i].symbol_val;
+
+		if (!type_coerces(info.args[i], type, types, symb) && i < argc) {
 			error(
 				1, 
 				"Argument %d for %s expected %s, found %s", 
@@ -190,12 +277,12 @@ type_t type_of_call(type_list_t types, ast_call_t call) {
 	return info.ret;
 }
 
-type_t type_of_expr(type_list_t types, ast_expr_t expr) {
+type_t type_of_expr(type_list_t *types, ast_expr_t expr) {
 	type_t expr_type;
 
 	switch (expr.kind) {
 		case AST_EXPR_SYMBOL:
-			expr_type = types_get(types, expr.symbol_val);
+			expr_type = types_get(*types, expr.symbol_val);
 			log_trace("Symbol %s is type %s", expr.symbol_val, type_as_string(expr_type));
 			break;
 		case AST_EXPR_STRING: {
@@ -235,7 +322,12 @@ type_t type_of_expr(type_list_t types, ast_expr_t expr) {
 
 			for (size_t i = 1; i < buffer_len(expr.array); i++) {
 				type_t typei = type_of_expr(types, expr.array[i]);
-				if (!type_coerces(typei, type1))
+
+				char *symb = NULL;
+				if (expr.array[i].kind == AST_EXPR_SYMBOL)
+					symb = expr.array[i].symbol_val;
+				
+				if (!type_coerces(typei, type1, types, symb))
 					error(1, "Item %ld of array expected '%s', found '%s'", i, type_as_string(type1), type_as_string(typei));
 			}
 
@@ -261,7 +353,7 @@ type_t type_of_expr(type_list_t types, ast_expr_t expr) {
 
 
 		case AST_EXPR_REF: {
-			type_t var = types_get(types, expr.ref.var);
+			type_t var = types_get(*types, expr.ref.var);
 
 			if (var.kind == TYPE_VOID)
 				error(1, "Variable %s not found", expr.ref.var);
@@ -287,8 +379,14 @@ type_t type_of_expr(type_list_t types, ast_expr_t expr) {
 		case AST_EXPR_UNIOP:
 			switch (expr.unop.kind) {
 				case AST_UNOP_NOT: {}
-					type_t type = type_of_expr(types, *expr.unop.arg);
-					if (!type_coerces(type, type_kind(TYPE_BOOL)))
+					ast_expr_t arg = *expr.unop.arg;
+					type_t type = type_of_expr(types, arg);
+
+					char *symb = NULL;
+					if (arg.kind == AST_EXPR_SYMBOL)
+						symb = expr.symbol_val;
+					
+					if (!type_coerces(type, type_kind(TYPE_BOOL), types, symb))
 						error(1, "not expects Bool, found %s", type_as_string(type));
 
 					expr_type = type;
@@ -299,10 +397,20 @@ type_t type_of_expr(type_list_t types, ast_expr_t expr) {
 			break;
 
 		case AST_EXPR_BINOP: {}
-			type_t lhs = type_of_expr(types, *expr.binop.args[0]);
-			type_t rhs = type_of_expr(types, *expr.binop.args[1]);
+			ast_expr_t lhs_expr = *expr.binop.args[0];
+			ast_expr_t rhs_expr = *expr.binop.args[1];
+			type_t lhs = type_of_expr(types, lhs_expr);
+			type_t rhs = type_of_expr(types, lhs_expr);
 
-			if (!type_coerces(lhs, rhs)) 
+			char *lhs_symb = NULL;
+			char *rhs_symb = NULL;
+
+			if (lhs_expr.kind == AST_EXPR_SYMBOL)
+				lhs_symb = lhs_expr.symbol_val;
+			if (rhs_expr.kind == AST_EXPR_SYMBOL)
+				rhs_symb = rhs_expr.symbol_val;
+
+			if (!type_coerces(lhs, rhs, types, lhs_symb) or !type_coerces(rhs, lhs, types, rhs_symb))
 				error(1, "Operands to binary expression must be of the same type");
 
 			switch (expr.binop.kind) {
@@ -325,13 +433,17 @@ type_t type_of_expr(type_list_t types, ast_expr_t expr) {
 				case AST_BINOP_LTEQ:
 				case AST_BINOP_GTEQ:
 					expr_type = type_kind(TYPE_BOOL);
+
+					if (!type_coerces(lhs, rhs, types, lhs_symb) and !type_coerces(rhs, lhs, types, lhs_symb))
+						error(1, "Comparison operator must be applied on equal types");
+					
 					break;
 
 				case AST_BINOP_AND:
 				case AST_BINOP_OR:
-					if (!type_coerces(lhs, type_kind(TYPE_BOOL)))
+					if (!type_coerces(lhs, type_kind(TYPE_BOOL), types, lhs_symb))
 						error(1, "Boolean operator expected Bool, found %s", type_as_string(lhs));
-					if (!type_coerces(rhs, type_kind(TYPE_BOOL)))
+					if (!type_coerces(rhs, type_kind(TYPE_BOOL), types, lhs_symb))
 						error(1, "Boolean operator expected Bool, found %s", type_as_string(rhs));
 
 					expr_type = type_kind(TYPE_BOOL);
@@ -355,7 +467,7 @@ void check_body(type_t ret, type_list_t types, buffer_t(ast_statement_t) body) {
 
 		switch (st.kind) {
 			case AST_STATEMENT_DECL: {}
-				type_t exists = types_get(&ty, st.decl.name);
+				type_t exists = types_get(ty, st.decl.name);
 				if (exists.kind != TYPE_VOID)
 					error(1, "Attempted to redeclare variable %s", st.decl.name);
 				
@@ -367,11 +479,11 @@ void check_body(type_t ret, type_list_t types, buffer_t(ast_statement_t) body) {
 			case AST_STATEMENT_SET: {}
 				type_t type_var = types_get(ty, st.set.name);
 
-				type_t type_exp = type_of_expr(ty, st.set.val);
+				type_t type_exp = type_of_expr(&ty, st.set.val);
 
 				log_trace("Variable %s is type %s", st.set.name, type_as_string(type_var));
 
-				if (!type_coerces(type_var, type_exp))
+				if (!type_coerces(type_var, type_exp, &ty, st.set.name))
 					error(1, "Variable %s is of type %s, found %s", st.set.name, type_as_string(type_var), type_as_string(type_exp));
 				else 
 					*st.set.val.type = type_var;
@@ -379,51 +491,83 @@ void check_body(type_t ret, type_list_t types, buffer_t(ast_statement_t) body) {
 				break;
 
 			case AST_STATEMENT_LET: {
-				type_t exists = types_get(&ty, st.let.name);
+				type_t exists = types_get(ty, st.let.name);
 				//type_t exists;
 				if (exists.kind != TYPE_VOID)
 					error(1, "Attempted to redeclare variable %s", st.let.name);
 
-				type_t expr = type_of_expr(ty, st.let.val);
+				type_t expr = type_of_expr(&ty, st.let.val);
 				types_add(&ty, st.let.name, expr);
 				log_trace("Let type: %s", type_as_string(expr));
 				def_type(expr);
 				break;
 			}
 
-			case AST_STATEMENT_CFLOW: {}
-				type_t type_flw = type_of_expr(ty, st.cflow.cond);
+			case AST_STATEMENT_CFLOW: {
+				type_t type_flw = type_of_expr(&ty, st.cflow.cond);
 
-				if (!type_coerces(type_flw, type_kind(TYPE_BOOL)))
+				char *symb = NULL;
+				if (st.cflow.cond.kind == AST_EXPR_SYMBOL)
+					symb = st.cflow.cond.symbol_val;
+
+				if (!type_coerces(type_flw, type_kind(TYPE_BOOL), &ty, symb))
 					error(1, "Control flow condition expected bool, found %s", type_as_string(type_flw));
 
 				check_body(ret, ty, st.cflow.body);
 				break;
+			}
 
 			case AST_STATEMENT_STORE: {
-				type_t ptr = type_of_expr(ty, st.store.ptr);
-				type_t val = type_of_expr(ty, st.store.val);
+				type_t ptr = type_of_expr(&ty, st.store.ptr);
+				type_t val = type_of_expr(&ty, st.store.val);
+
+				char *symb = NULL;
+				if (st.store.val.kind == AST_EXPR_SYMBOL)
+					symb = st.store.val.symbol_val;
 
 				if (ptr.kind != TYPE_POINTER)
 					error(1, "Store expects pointer, found %s", type_as_string(ptr));
 
-				if (!type_coerces(*ptr.child, val ))
+				if (!type_coerces(*ptr.child, val, &ty, symb))
 					error(1, "Store expected %s, found %s", type_as_string(*ptr.child), type_as_string(val));
 
 				break;
 			}
 
-			case AST_STATEMENT_RETURN: {}
-				type_t type_ret = type_of_expr(ty, st.ret);
+			case AST_STATEMENT_RETURN: {
+				type_t type_ret = type_of_expr(&ty, st.ret);
 
-				if (!type_coerces(ret, type_ret))
+				char *symb = NULL;
+				if (st.ret.kind == AST_EXPR_SYMBOL)
+					symb = st.ret.symbol_val;
+
+				if (!type_coerces(ret, type_ret, &ty, symb))
 					error(1, "Expected return type %s, found %s", type_as_string(ret), type_as_string(type_ret));
 
 				break;
+			}
 
 			case AST_STATEMENT_CALL: 
-				type_of_call(ty, st.call);
+				type_of_call(&ty, st.call);
 				break;
+		}
+	}
+
+	for (size_t i = 0; i < buffer_len(body); i++) {
+		ast_statement_t st = body[i];
+
+		if (st.kind == AST_STATEMENT_LET and is_partial(*st.let.val.type)) {
+			type_t type = types_get(ty, st.let.name);
+
+			if (type.kind == TYPE_VOID)
+				error(1, "Internal compiler error: variable %s has type TYPE_VOID", st.let.name);
+
+			if (is_partial(type))
+				error(1, "Not enough info to infer type of variable %s", st.let.name);
+
+			log_trace("Inferred type %s for variable %s", type_as_string(type), st.let.name);
+
+			*st.let.val.type = type;
 		}
 	}
 }
@@ -459,6 +603,9 @@ void type_check(ast_program_t program) {
 	}
 
 	assert(!type_coerces(type_kind(TYPE_U8), type_kind(TYPE_I32)));
+
+	assert(is_partial(type_kind(TYPE_INTEGER)));
+	assert(!is_partial(type_kind(TYPE_I64)));
 
 	log_info("End type checking");
 }

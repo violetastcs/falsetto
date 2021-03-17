@@ -1,0 +1,1 @@
+int printf(unsigned char* fmt,...);void print_i64(long long i){printf("%ld",i);}int main(int argc,signed char** argv){long long x=10;print_i64(x);return 0;}
