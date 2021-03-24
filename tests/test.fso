@@ -1,3 +1,9 @@
+(record Vec3 { 
+	[ x I32 ]
+	[ y I32 ]
+	[ z I32 ]
+})
+
 (func printf [ (fmt (@ U8)) ... ] I32)
 
 (func print_i64 [ (i I64) ] Void {
@@ -8,6 +14,8 @@
 	(let x 10)
 
 	(print_i64 x)
+
+	(decl y (Record Vec3))
 		
 	(return 0)
 })

@@ -283,6 +283,20 @@ void compile_program(FILE *outp, ast_program_t program) {
 				}
 				
 				break;
+
+			case AST_TL_RECORD:
+				log_trace("Compiling record definition (AST_TL_RECORD)");
+
+				fprintf(outp, "struct %s{", item.record.name);
+
+				for (size_t i = 0; i < buffer_len(item.record.fields); i++) {
+					record_field_t field = item.record.fields[i];
+					fprintf(outp, "%s %s;", type_to_str(field.type), field.name);
+				}
+
+				fputc('}', outp);
+
+				break;
 		}
 	}
 }

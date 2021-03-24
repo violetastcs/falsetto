@@ -31,6 +31,28 @@
 buffer_t(uint64_t) def_hashes = NULL;
 buffer_t(char *) defs = NULL;
 
+typedef struct record_entry {
+	uint64_t hash;
+	record_t record;
+} record_entry_t;
+
+buffer_t(record_entry_t) records;
+
+void record_def(record_t record) {
+	uint64_t hash = str_hash(record.name);
+
+	for (size_t i = 0; i < buffer_len(records); i++) {
+		if (records[i].hash == hash)
+			error(1, "Record %s already defined");
+	}
+
+	record_entry_t entry;
+	entry.hash = hash;
+	entry.record = record;
+
+	buffer_push(records, entry);
+}
+
 typedef struct item_type_info {
 	uint64_t hash;
 	type_t type;
@@ -596,6 +618,14 @@ void type_check(ast_program_t program) {
 					types_add(&types, tl.func.args[i].name, tl.func.args[i].type);
 
 				check_body(tl.func.ret, types, tl.func.body);
+				break;
+
+			case AST_TL_RECORD:
+				record_def(tl.record);
+
+				for (size_t i = 0; i < buffer_len(tl.record.fields); i++)
+					def_type(tl.record.fields[i].type);
+
 				break;
 
 			default: break;

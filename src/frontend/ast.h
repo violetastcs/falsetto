@@ -46,7 +46,9 @@ typedef enum type_kind {
 	TYPE_VOID,
 
 	TYPE_POINTER,
-	TYPE_ARRAY
+	TYPE_ARRAY,
+
+	TYPE_RECORD
 } type_kind_t;
 
 char *type_str[] = {
@@ -82,8 +84,21 @@ typedef struct type {
 	type_kind_t kind;
 
 	size_t count;
-	struct type *child;
+	union {
+		struct type *child;
+		char *record;
+	};
 } type_t;
+
+typedef struct record_field {
+	char *name;
+	type_t type;
+} record_field_t;
+
+typedef struct record {
+	char *name;
+	buffer_t(record_field_t) fields;
+} record_t;
 
 char *type_as_string(type_t type) {
 	switch (type.kind) {
@@ -91,7 +106,8 @@ char *type_as_string(type_t type) {
 			return heap_fmt("(Array %s %d)", type_as_string(*type.child), type.count);
 		case TYPE_POINTER:
 			return heap_fmt("(@ %s)", type_as_string(*type.child));
-
+		case TYPE_RECORD:
+			return heap_fmt("(Record %s)", type.record);
 		default:
 			return type_str_lang[type.kind];
 	}
@@ -103,6 +119,8 @@ char *type_mangle(type_t type) {
 			return heap_fmt("_Array%s_%d", type_mangle(*type.child), type.count);
 		case TYPE_POINTER:
 			return heap_fmt("_Pointer%s", type_mangle(*type.child));
+		case TYPE_RECORD:
+			return heap_fmt("_Record_%s", type.record);
 		default:
 			return heap_fmt("_%s", type_str_lang[type.kind]);
 	}
@@ -112,6 +130,8 @@ char *type_to_str(type_t type) {
 	switch (type.kind) {
 		case TYPE_ARRAY:
 			return type_mangle(type);
+		case TYPE_RECORD:
+			return heap_fmt("struct %s", type.record);
 		case TYPE_POINTER:
 			return heap_fmt("%s*", type_to_str(*type.child));
 		default:
@@ -239,6 +259,13 @@ type_t parse_type(atom_t type) {
 				t.kind = TYPE_POINTER;
 				t.child = malloc(sizeof(type_t));
 				*t.child = parse_type(type.expr[1]);
+			} else if (is_symbol(type.expr[0], "Record")) {
+				t.kind = TYPE_RECORD;
+
+				if (type.expr[1].kind != ATOM_SYMBOL)
+					error(1, "Record name must be symbol");
+
+				t.record = type.expr[1].symbol_val;
 			} else 
 				error(1, "Invalid type modifier");
 			break;
@@ -339,12 +366,24 @@ typedef struct ast_expr {
 		char *ref_to;
 		int64_t int_val;
 		char *string_val;
-		char *symbol_val;
+		buffer_t(char *) path;
 		double float_val;
 		bool bool_val;
 		buffer_t(struct ast_expr) array;
 	};
 } ast_expr_t;
+
+buffer_t(char *) parse_path(char *symbol) {
+	buffer_t(char *) tmp;
+
+	char *cur = symbol;
+	
+	for (size_t i = 0; i < strlen(symbol); i++) {
+		
+	}
+
+	return tmp;
+}
 
 ast_expr_t parse_ast_expr(atom_t expr) {
 	ast_expr_t e;
@@ -797,7 +836,8 @@ typedef struct ast_func {
 
 typedef enum ast_tl_kind {
 	AST_TL_FUNC,
-	AST_TL_INCLUDE
+	AST_TL_INCLUDE,
+	AST_TL_RECORD
 } ast_tl_kind_t;
 
 typedef struct ast_tl {
@@ -806,6 +846,7 @@ typedef struct ast_tl {
 	union {
 		char *inc_file;
 		ast_func_t func;
+		record_t record;
 	};
 } ast_tl_t;
 
@@ -866,7 +907,41 @@ ast_program_t parse_program(atom_t program) {
 				item.func = func;
 			} else 
 				error(1, "Invalid argument count to func");
-			
+
+		} else if (strcmp(symbol, "record") == 0) {
+			item.kind = AST_TL_RECORD;
+
+			record_t record;
+
+			if (!is_symbol(expr.expr[1], NULL))
+				error(1, "Record name must be a symbol");
+
+			record.name = expr.expr[1].symbol_val;
+			record.fields = NULL;
+
+			if (expr.expr[2].kind != ATOM_EXPR)
+				error(1, "Record expects list of fields");
+
+			for (size_t i = 0; i < buffer_len(expr.expr[2].expr); i++) {
+				atom_t field_atom = expr.expr[2].expr[i];
+
+				record_field_t field;
+
+				if (field_atom.kind != ATOM_EXPR and buffer_len(field_atom.expr) != 2)
+					error(1, "Record field must be in format (name type)");
+
+				if (field_atom.expr[0].kind != ATOM_SYMBOL)
+					error(1, "Record field must have symbol identifier");
+
+				field.name = field_atom.expr[0].symbol_val;
+				field.type = parse_type(field_atom.expr[1]);
+
+				buffer_push(record.fields, field);
+			}	
+
+			item.record = record;
+		} else {
+			error(1, "Unknown top level item");
 		}
 		LOOP_END:
 		buffer_push(prog.items, item);
